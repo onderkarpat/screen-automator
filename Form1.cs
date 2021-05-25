@@ -45,12 +45,23 @@ using FuncName = System.String;
 using StmtLabel = System.String;
 using VarName = System.String;
 using RetVal = System.String;
+using System.Linq;
 
-internal struct RunContext
-{
+internal struct RunContext {
+    internal AIScreenAutomationApp.Form1 form;
     internal Point screenMatchLoc;
+    internal Size matchSize;
     internal Point actionOffsetPt;
-    internal STMT_CONDITIONS currCond;
+    private STMT_CONDITIONS _currCond;
+    internal STMT_CONDITIONS currCond {
+        get {
+            return _currCond;
+        } // get
+        set {
+            form.updateVariableTableRow("currCond", _currCond.ToString(), false, "All,Debug");
+            _currCond = value;
+        } // set
+    } // currCond
     internal string retVal;
     internal Dictionary<string, string> vars;
     internal Dictionary<string, List<string>> arrays;
@@ -59,26 +70,30 @@ internal struct RunContext
     internal Dictionary<string, Image> imagesCaptured; // Used for debugging for now.
     internal string clipboard;
     internal Rectangle copyClipboardRect;
-}
+} // struct RunContext
 
-namespace AIScreenAutomationApp
-{
+namespace AIScreenAutomationApp {
     public partial class Form1 : Form {
+        private Point panStartingPoint = Point.Empty;
+        private Point panMovingPoint = Point.Empty;
+        private bool panning = false;
         internal static Form1 gForm = null;
         internal BackgroundWorker runWorker;
-        private double[] minValues;
-        private double[] maxValues;
-        private Point[] minLocations;
-        private Point[] maxLocations;
+        internal double[] minValues;
+        internal double[] maxValues;
+        internal Point[] minLocations;
+        internal Point[] maxLocations;
         internal Stack<Tuple<FuncName, StmtLabel, RetVal, List<string>>> callStack;
         internal Stack<VarName> argStack;
         internal global::Folder folder;
         internal PROGRAM_STATE programState;
+        internal Image uiBoxCalibrateCaptureImgNonZoom;
         internal int selectedFuncIndex = -1;
         internal int selectedProgIndex = -1;
         internal TesseractEngine ocrEngine = null;
         internal RunContext runContext;
-        private Stack<string> indent = new Stack<string>();
+        internal int zoomRatio = 100;
+        internal Stack<string> indent = new Stack<string>();
         internal Script nullScript = null;
         internal Function nullFunc = null;
         internal Statement nullStmt = null;
@@ -86,70 +101,58 @@ namespace AIScreenAutomationApp
         internal Dictionary<string, bool> skipList;
         internal Dictionary<object, EventHandler> callbackMap;
         internal Dictionary<object, bool> callbackMapStatus;
+        internal int PB_PADDING;
+        internal bool breakOnException = true;
+        internal bool stopOnException = true;
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        public string funcName()
-        {
+        internal string funcName() {
             var st = new StackTrace();
             var sf = st.GetFrame(1);
 
             return sf.GetMethod().Name;
         } // funcName
-        internal void selectUpdateEnable<T>(T list, bool isEnabled)
-        {
+        internal void selectUpdateEnable<T>(T list, bool isEnabled) {
             dtbegin(funcName());
             {
                 var obj = list as ToolStripComboBox;
-                if (obj != null){
+                if (obj != null) {
                     callbackMapStatus[list] = isEnabled;
-                    if (isEnabled)
-                    {
+                    if (isEnabled) {
                         obj.SelectedIndexChanged += callbackMap[list];
-                    }
-                    else
-                    {
+                    } else {
                         obj.SelectedIndexChanged -= callbackMap[list];
                     } // if
-                }
+                } // if
             }
             {
                 var obj = list as ComboBox;
-                if (obj != null)
-                {
+                if (obj != null) {
                     callbackMapStatus[list] = isEnabled;
-                    if (isEnabled)
-                    {
+                    if (isEnabled) {
                         obj.SelectedIndexChanged += callbackMap[list];
-                    }
-                    else
-                    {
+                    } else {
                         obj.SelectedIndexChanged -= callbackMap[list];
                     } // if
-                }
+                } // if
             }
             {
                 var obj = list as ListBox;
-                if (obj != null)
-                {
+                if (obj != null) {
                     callbackMapStatus[list] = isEnabled;
-                    if (isEnabled)
-                    {
+                    if (isEnabled) {
                         obj.SelectedIndexChanged += callbackMap[list];
-                    }
-                    else
-                    {
+                    } else {
                         obj.SelectedIndexChanged -= callbackMap[list];
                     } // if
-                }
+                } // if
             }
             dtend();
         } // selectUpdateEnable
-        internal TextBox getOutputWindow()
-        {
+        internal TextBox getOutputWindow() {
             return uiOutputWindow;
         } // function getOutputWindow
-        public Form1()
-        {
+        internal Form1() {
             ocrEngine = new TesseractEngine(@".", "eng", EngineMode.Default);
             gForm = this;
             InitializeComponent();
@@ -192,9 +195,7 @@ namespace AIScreenAutomationApp
             callbackMap[uiBBCondList] = uiBBCondChanged;
             callbackMap[uiInstParams] = uiInstParamSelectChanged;
             callbackMap[uiInstParamRight] = uiInstParamRight_SelectedIndexChanged;
-            runContext.vars = new Dictionary<string, string>();
-            runContext.arrays = new Dictionary<string, List<string>>();
-            runContext.imagesCaptured = new Dictionary<string, Image>();
+            resetRunContext();
             runWorker = new BackgroundWorker();
             runWorker.DoWork += new DoWorkEventHandler(runInst);
             runWorker.RunWorkerCompleted += new RunWorkerCompletedEventHandler(runInstFinished);
@@ -215,36 +216,139 @@ namespace AIScreenAutomationApp
             programState = PROGRAM_STATE.STOP;
             folder = new Folder();
             updateUIStates();
-        } // function Form1
+            uiVariableTableInit();
+            uiVariablesTableGroupList.Items.Add("All");
+            uiVariablesTableGroupList.Items.Add("Images");
+            uiVariablesTableGroupList.Items.Add("Globals");
+            uiVariablesTableGroupList.Items.Add("Debug");
+            uiVariablesTableGroupList.Items.Add("Locals");
+            uiVariablesTableGroupList.Items.Add("Persistents");
+            uiVariablesTableGroupList.SelectedIndex = 0;
 
+            void UiBoxCalibrateCaptureImgPanel_MouseWheel(object sender, MouseEventArgs e) {
+                void ZoomIn() {
+                    zoomRatio += 5;
+                } // ZoomIn
+                void ZoomOut() {
+                    if (zoomRatio > 15) {
+                        zoomRatio -= 5;
+                    } // if
+                } // ZoomOut
+                // uiBoxCalibrateZoomLabel
+                try {
+                    if (e.Delta < 0) {
+                        ZoomIn();
+                    } else {
+                        ZoomOut();
+                    } // if
+                    Bitmap bitmap = new Bitmap(uiBoxCalibrateCaptureImgNonZoom);
+                    Image<Bgr, Byte> image = bitmap.ToImage<Bgr, Byte>().Resize(zoomRatio / 100.0, Inter.Nearest);
+                    uiBoxCalibrateCaptureImg.Image = image.ToBitmap();
+                    uiBoxCalibrateCaptureImg.Width = image.Width;
+                    uiBoxCalibrateCaptureImg.Height= image.Height;
+                } catch (Exception ) {
+                    zoomRatio = 100;
+                } // try
+                ((HandledMouseEventArgs)e).Handled = true;
+                uiBoxCalibrateZoomLabel.Text = $"Zoom @{zoomRatio}%";
+            } // UiBoxCalibrateCaptureImgPanel_MouseWheel
+            void UiBoxCalibrateCaptureImg_MouseUp(object sender, MouseEventArgs e) {
+                panning = false;
+            } // UiBoxCalibrateCaptureImg_MouseUp
+            void UiBoxCalibrateCaptureImg_MouseDown(object sender, MouseEventArgs e) {
+                panning = true;
+                panStartingPoint = new Point(e.Location.X - panMovingPoint.X,
+                                          e.Location.Y - panMovingPoint.Y);
+            } // UiBoxCalibrateCaptureImg_MouseDown
+            void UiBoxCalibrateCaptureImg_MouseMove(object sender, MouseEventArgs e) {
+                PictureBox pb = sender as PictureBox;
+                try {
+                    if (panning) {
+                        panMovingPoint = new Point(e.Location.X - panStartingPoint.X,
+                                                e.Location.Y - panStartingPoint.Y);
+                        uiBoxCalibrateCaptureImg.Invalidate();
+                    } else {
+                        if (pb.Image != null) {
+                            var bitmap = new Bitmap(pb.Image);
+                            int x = e.Location.X - panMovingPoint.X;
+                            int y = e.Location.Y - panMovingPoint.Y;
+                            x = (int)(x / (float)zoomRatio * 100.0);
+                            y = (int)(y / (float)zoomRatio * 100.0);
+                            if (x >= 0 && y >= 0 && x <bitmap.Width && y < bitmap.Height) {
+                                var val = bitmap.GetPixel(x, y);
+                                uiBoxCalibratePosValLabel.Text = $"{x},{y}={val}";
+                            } else {
+                                uiBoxCalibratePosValLabel.Text = $"{x},{y}=?";
+                            } // if
+                        } // if
+                    } // if
+                } catch (Exception ex) {
+                    uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+                } // try
+            } // UiBoxCalibrateCaptureImg_MouseMove
+            void UiBoxCalibrateCaptureImg_Paint(object sender, PaintEventArgs e) {
+                try {
+                    PictureBox pb = sender as PictureBox;
+                    if (pb.Image != null) {
+                        e.Graphics.Clear(Color.White);
+                        e.Graphics.DrawImage(pb.Image, panMovingPoint);
+                    } // if
+                } catch (Exception ex) {
+                    uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+                } // try
+            } // UiBoxCalibrateCaptureImg_Paint
+            uiBoxCalibrateCaptureImgPanel.MouseWheel += UiBoxCalibrateCaptureImgPanel_MouseWheel;
+            uiBoxCalibrateCaptureImg.MouseDown += UiBoxCalibrateCaptureImg_MouseDown;
+            uiBoxCalibrateCaptureImg.MouseUp += UiBoxCalibrateCaptureImg_MouseUp;
+            uiBoxCalibrateCaptureImg.MouseMove += UiBoxCalibrateCaptureImg_MouseMove;
+            uiBoxCalibrateCaptureImg.Paint += UiBoxCalibrateCaptureImg_Paint;
+        } // function Form1
+        internal void resetRunContext() {
+            runContext.vars = new Dictionary<string, string>();
+            runContext.arrays = new Dictionary<string, List<string>>();
+            runContext.imagesCaptured = new Dictionary<string, Image>();
+            runContext.form = this;
+            runContext.vars["retVal"] = "<null>";
+            runContext.vars["comma"] = ",";
+            runContext.vars["at"] = "@";
+            runContext.clipboard = "";
+            runContext.currCond = STMT_CONDITIONS.NE;
+        } // resetRunContext
+        private void UiBoxCalibrateCaptureImgPanel_MouseWheel(object sender, MouseEventArgs e) {
+            throw new NotImplementedException();
+        } // UiBoxCalibrateCaptureImgPanel_MouseWheel
+        internal string checkBreak {
+            get {
+                if (breakOnException) {
+                    Debugger.Break();
+                } // if
+                if (stopOnException) {
+                    programState = PROGRAM_STATE.STOP;
+                } // if
+                return "";
+            } // get
+        } // checkBreak;
         #region Dynamic Properties
         internal bool progRunning {
             get {
                 return programState == PROGRAM_STATE.RUNNING;
             } // get
         } // property progRunning
-        internal ImageLibrary imageLib
-        {
-            get
-            {
+        internal ImageLibrary imageLib {
+            get {
                 return folder.imageLibrary;
             } // get
         } // ImageLibrary imageLib 
-        internal PictureBox selectedImageVarPB
-        {
-            get
-            {
-                foreach (PictureBox pb in uiImageLibrary.Controls)
-                {
-                    if (pb.BorderStyle == BorderStyle.Fixed3D)
-                    {
+        internal PictureBox selectedImageVarPB {
+            get {
+                foreach (PictureBox pb in uiImageLibrary.Controls) {
+                    if (pb.BorderStyle == BorderStyle.FixedSingle) {
                         return pb;
                     } // if
                 } // foreach
                 return null;
             } // get
         } // selectedImageVar
-
         internal Script currProg {
             get {
                 if (folder.progList.Count == 0) return null;
@@ -255,10 +359,9 @@ namespace AIScreenAutomationApp
         internal Function currFunc {
             get {
                 if (currProg == null) return null;
-                if (currProg.funcList.Exists(func => func.funcName == uiFuncList.Text))
-                {
+                if (currProg.funcList.Exists(func => func.funcName == uiFuncList.Text)) {
                     return currProg.funcList.Find(func => func.funcName == uiFuncList.Text);
-                }
+                } // if
                 return null;
             } // get
         } // currFunc
@@ -280,7 +383,7 @@ namespace AIScreenAutomationApp
         internal Instruction currInst {
             get {
                 Instruction retVal = null;
-                if (uiInstList.SelectedIndex != -1) {
+                if (currStmt != null && uiInstList.SelectedIndex != -1) {
                     if (currStmt.instructions.Count == 0) return null;
                     return currStmt.instructions[uiInstList.SelectedIndex];
                 } // if
@@ -314,79 +417,71 @@ namespace AIScreenAutomationApp
         #endregion
 
         #region Debugging related functions
-        internal T dtend<T>(T expr, [CallerLineNumber] int lineNum = -1, [CallerFilePath] string fileName = "")
-        {
+        internal T dtend<T>(T expr, [CallerLineNumber] int lineNum = -1, [CallerFilePath] string fileName = "") {
             debugOut($"}} // {indent.Pop()}", lineNum, fileName);
             return expr;
-        }
-        internal void dtend([CallerLineNumber] int lineNum = -1, [CallerFilePath] string fileName = "")
-        {
-            try
-            {
-                if (!skipList.ContainsKey(indent.Peek()))
-                {
+        } // dtend<T>
+        internal void dtend([CallerLineNumber] int lineNum = -1, [CallerFilePath] string fileName = "") {
+            try {
+                if (!skipList.ContainsKey(indent.Peek())) {
                     debugOut($"}} // {indent.Peek()}", lineNum, fileName);
                 } // if
                 indent.Pop();
-            } catch (Exception e)
-            {
+            } catch (Exception e) {
                 debugOut($"Exception", lineNum, fileName);
-            }
+            } // try
         } // dtend
-        internal void dtbegin(string text, [CallerLineNumber] int lineNum = -1, [CallerFilePath] string fileName = "")
-        {
-            try
-            {
-                if (!skipList.ContainsKey(text))
-                {
+        internal void dtbegin(string text, [CallerLineNumber] int lineNum = -1, [CallerFilePath] string fileName = "") {
+            try {
+                if (!skipList.ContainsKey(text)) {
                     debugOut($"{text}() {{", lineNum, fileName);
                 } // if
                 indent.Push(text);
-            } catch (Exception e)
-            {
-
-            }
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
         } // dtbegin
-        internal void debugOut(string text, int lineNum=-1, string fileName="")
-        {
-            try
-            {
+        internal void debugOut(string text, int lineNum=-1, string fileName="") {
+            try {
                 uiDebugWindow.AppendText(text + Environment.NewLine);
-            }
-            catch (Exception e) { }
+            } catch (Exception e) { 
+            } // try
             string pad = indent.Count != 0 ? new string(' ', indent.Count*4) : "";
             string loc = $"{fileName}({lineNum,-4}):";
             Console.WriteLine($"{loc}{pad}{text}");
         } // debugOut
-        internal void stdOut(string text)
-        {
-            try
-            {
+        internal void stdOut(string text) {
+            try {
                 uiOutputWindow.AppendText(text);
-            }
-            catch (Exception e) { }
+            } catch (Exception e) { 
+            } // try
             Console.WriteLine(text);
         } // debugOut
         internal void putImage(string name, Bitmap image) {
-            ImageVar imImage = null;
-            List<ImageVar> ivs = folder.imageLibrary.findImage(name);
-            if (ivs.Count != 0) {
-                imImage = ivs[0];
-            } // if
-            if (imImage != null) {
-                imImage.image = image;
-                imImage.pb.Image = image;
-            } else {
-                var pb = new PictureBox();
-                pb.Click += new System.EventHandler(this.uiILImageClicked);
-                pb.Image = image;
-                pb.BorderStyle = BorderStyle.None;
-                var iv = new ImageVar(image, folder.imageLibrary, pb);
-                iv.imageName = name;
-                folder.imageLibrary.imageVars.Add(iv);
-                folder.imageLibrary.pb2ImageVar[pb] = iv;
-                uiImageLibrary.Controls.Add(pb);
-            } // if
+            try {
+                ImageVar imImage = null;
+                List<ImageVar> ivs = folder.imageLibrary.findImage(name);
+                if (ivs.Count != 0) {
+                    imImage = ivs[0];
+                } // if
+                if (imImage != null) {
+                    imImage.image = image;
+                    imImage.pb.Image = image;
+                } else {
+                    var pb = new PictureBox();
+                    pb.Click += new System.EventHandler(this.uiILImageClicked);
+                    pb.Image = image;
+                    pb.Padding = new Padding(PB_PADDING);
+                    pb.BorderStyle = BorderStyle.None;
+                    var iv = new ImageVar(image, folder.imageLibrary, pb);
+                    iv.imageName = name;
+                    folder.imageLibrary.imageVars.Add(iv);
+                    folder.imageLibrary.pb2ImageVar[pb] = iv;
+                    uiImageLibrary.Controls.Add(pb);
+                } // if
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
         } // putImage
         #endregion
 
@@ -394,209 +489,270 @@ namespace AIScreenAutomationApp
         internal bool IsStmtLabelUnique(string name) {
             dtbegin(funcName());
             int index = uiStmtList.FindStringExact(name);
-            
             return dtend(index == -1);
         } // function IsStmtLabelUnique
         internal void updateUIStates() {
             dtbegin(funcName());
-            uiNewFuncButton.Enabled = currProg != null;
-            uiDelFuncButton.Enabled = currProg != null;
-            uiFunctionRun.Enabled = currProg != null;
-            uiFuncList.Enabled = currProg != null;
-            uiProgList.Enabled = uiProgList.Items.Count != 0;
-            uiDelProgButton.Enabled = uiProgList.Items.Count != 0;
-
-            if (programState == PROGRAM_STATE.RUNNING)
-            {
-                uiImageLibrary.Visible = false;
-            } else
-            {
-                uiImageLibrary.Visible = true;
-            } // if
+            try {
+                uiNewFuncButton.Enabled = currProg != null;
+                uiDelFuncButton.Enabled = currProg != null;
+                uiFunctionRun.Enabled = currProg != null;
+                uiFuncList.Enabled = currProg != null;
+                uiProgList.Enabled = uiProgList.Items.Count != 0;
+                uiDelProgButton.Enabled = uiProgList.Items.Count != 0;
+                if (programState == PROGRAM_STATE.RUNNING || programState == PROGRAM_STATE.STEPINST) {
+                    uiImageLibrary.Visible = false;
+                } else {
+                    uiImageLibrary.Visible = true;
+                } // if
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
             dtend();
         } // function updateGroupBoxVisibility
-        internal void updateTargetImage(ref PictureBox image, Bitmap inBitmap, string offset)
-        {
+        internal void updateTargetImage(ref PictureBox image, Bitmap inBitmap, string offset) {
             dtbegin(funcName());
-            Bitmap bitmap = new Bitmap(inBitmap);
-            using (var graphics = Graphics.FromImage(bitmap))
-            {
-                Pen pen = new Pen(Color.Red, 1);
-                int x = bitmap.Width / 2;
-                int y = bitmap.Height / 2;
-                if (offset != null && offset != "")
-                {
-                    var parts = offset.Split(',');
-                    x = int.Parse(parts[0]);
-                    y = int.Parse(parts[1]);
-                } // if
-                graphics.DrawLine(pen, x, 0, x, bitmap.Height);
-                graphics.DrawLine(pen, 0, y, bitmap.Width, y);
-            } // using graphics
-            image.Image = (Image)bitmap;
+            try {
+                Bitmap bitmap = new Bitmap(inBitmap);
+                using (var graphics = Graphics.FromImage(bitmap)) {
+                    Pen pen = new Pen(Color.Red, 1);
+                    int x = bitmap.Width / 2;
+                    int y = bitmap.Height / 2;
+                    if (offset != null && offset != "") {
+                        var parts = offset.Split(',');
+                        x = int.Parse(parts[0]);
+                        y = int.Parse(parts[1]);
+                    } // if
+                    graphics.DrawLine(pen, x, 0, x, bitmap.Height);
+                    graphics.DrawLine(pen, 0, y, bitmap.Width, y);
+                } // using graphics
+                image.Image = (Image)bitmap;
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
             dtend();
         } // function updateTargetImage
         internal void showStmts() {
             dtbegin(funcName());
-            if (currFunc != null)
-            {
-                uiStmtList.Items.Clear();
-                foreach (Statement stmt in currFunc.stmtList)
-                {
-                    uiStmtList.Items.Add(stmt.text);
-                } // foreach 
-                uiStmtList.SelectedIndex = uiStmtList.Items.Count == 0 ? -1 : 0;
-            } // if
+            try {
+                if (currFunc != null) {
+                    uiStmtList.Items.Clear();
+                    foreach (Statement stmt in currFunc.stmtList) {
+                        uiStmtList.Items.Add(stmt.text);
+                    } // foreach 
+                    uiStmtList.SelectedIndex = uiStmtList.Items.Count == 0 ? -1 : 0;
+                } // if
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
             dtend();
         } // function showStmts
-        internal void showInsts()
-        {
+        internal void showInsts() {
             dtbegin(funcName());
-            if (currStmt != null) {
-                uiInstList.Items.Clear();
-                foreach (Instruction inst in currStmt.instructions)
-                {
-                    uiInstList.Items.Add(inst.text);
-                } // foreach 
-                uiInstList.SelectedIndex = uiInstList.Items.Count == 0 ? -1 : 0;
-            } // if
+            try { 
+                if (currStmt != null) {
+                    uiInstList.Items.Clear();
+                    foreach (Instruction inst in currStmt.instructions) {
+                        uiInstList.Items.Add(inst.text);
+                    } // foreach 
+                    uiInstList.SelectedIndex = uiInstList.Items.Count == 0 ? -1 : 0;
+                } // if
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
             dtend();
         } // function showInsts
-        internal void updateStmtUI(string name, int uiInstIndex = -1)
-        {
+        internal void updateStmtUI(string name, int uiInstIndex = -1) {
             dtbegin(funcName());
-            if (currProg == null || currFunc == null) { }
-            else
-            {
-                selectUpdateEnable(uiInstList, false); 
-                foreach (Statement stmt in currFunc.stmtList)
-                {
-                    if (stmt.stmtLabel == name)
-                    {
-                        uiInstList.Items.Clear();
-                        foreach (dynamic inst in stmt.instructions)
-                        {
-                            uiInstList.Items.Add(inst.text);
-                        } // foreach
-                        if (!progRunning && uiInstList.SelectedIndex != -1)
-                        {
-                            uiBBCondList.Text = currInst.instCondition.ToString();
+            try { 
+                if (currProg == null || currFunc == null) { }
+                else {
+                    selectUpdateEnable(uiInstList, false); 
+                    foreach (Statement stmt in currFunc.stmtList) {
+                        if (stmt.stmtLabel == name || stmt.text == name) {
+                            uiInstList.Items.Clear();
+                            foreach (dynamic inst in stmt.instructions) {
+                                uiInstList.Items.Add(inst.text);
+                            } // foreach
+                            if (!progRunning && uiInstList.SelectedIndex != -1) {
+                                uiBBCondList.Text = currInst.instCondition.ToString();
+                            } // if
+                            break;
                         } // if
-                        break;
+                    } // foreach
+                    selectUpdateEnable(uiInstList, true); 
+                    if (uiInstIndex != -1) {
+                        uiInstList.SelectedIndex = uiInstIndex;
+                    } else {
+                        uiInstList.SelectedIndex = uiInstList.Items.Count - 1;
                     } // if
-                } // foreach
-                selectUpdateEnable(uiInstList, true); 
-                if (uiInstIndex != -1)
-                {
-                    uiInstList.SelectedIndex = uiInstIndex;
-                }
-                else
-                {
-                    uiInstList.SelectedIndex = uiInstList.Items.Count - 1;
-                }
-            }
+                } // if
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
             dtend();
         } // function updateStmtUI
         #endregion
 
         #region Execution related codes
-        private void uiProgRunClicked(object sender, EventArgs e)
-        {
+        internal void uiProgRunClicked(object sender, EventArgs e) {
             dtbegin(funcName());
-            if (uiProgRun.Enabled != false)
-            {
-                uiProgRun.Enabled = false;
+            try { 
+                if (uiProgRun.Enabled != false) {
+                    uiProgRun.Enabled = false;
+                    resetRunContext();
+                    programState = PROGRAM_STATE.RUNNING;
+                    uiFunctionRun.Enabled = !uiFunctionRun.Enabled;
+                    uiProgRun.Enabled = !uiProgRun.Enabled;
+                    callStack = new Stack<Tuple<FuncName, StmtLabel, RetVal, List<string>>>();
+                    foreach (Function func in currProg.funcList) {
+                        if (func.funcName == "Main") {
+                            uiFuncList.SelectedItem = "Main";
+                            //Cursor.Hide();
+                            debugOut("Run func: " + currFunc.funcName);
+                            if (uiStmtList.Items.Count != 0) {
+                                uiStmtList.SelectedIndex = 0;
+                                uiInstList.SelectedIndex = uiInstList.Items.Count == 0 ? -1 : 0;
+                                debugOut("Run stmt: " + currStmt.stmtLabel);
+                                runWorker.RunWorkerAsync(currInst);
+                            } else {
+                                debugOut("Function is empty");
+                            } // if
+                            dtend();
+                            return;
+                        } // if
+                    } // foreach
+                    uiStatusLabel.Text = "Could not find function 'Main'.";
+                } // if
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
+            dtend();
+        } // function uiProgRunClicked
+        internal void updateVariableTableRow(string name, string value, bool isArray, string groups) {
+            try {
+                foreach (DataGridViewRow row in uiVariablesTable.Rows) {
+                    if ((string)row.Cells["Name"].Value == name) {
+                        uiVariablesTable.Rows.Remove(row);
+                        break;
+                    } // if
+                } // foreach
+                if (uiVariablesTableGroupList.SelectedItem != null && new List<string>(groups.Split(',')).Contains(uiVariablesTableGroupList.SelectedItem.ToString())) {
+                    if (isArray == false) {
+                        if (runContext.vars.ContainsKey(name)) {
+                            uiVariablesTable.Rows.Add(new string[] { name, runContext.vars[name] });
+                        } else if (value != "null") {
+                            uiVariablesTable.Rows.Add(new string[] { name, value });
+                        } // if
+                    } else {
+                        if (runContext.arrays.ContainsKey(name.Substring(1))) {
+                            uiVariablesTable.Rows.Add(new string[] { name, string.Join(",", runContext.arrays[name.Substring(1)]) });
+                        } else if (value != "null") {
+                            uiVariablesTable.Rows.Add(new string[] { name, value });
+                        } // if
+                    } // if
+                } // if
+                uiVariablesTable.Invalidate();
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}";
+            } // try
+        } // updateVariableTableRow
+        internal void uiInstRunButtonClicked(object sender, EventArgs e) {
+            dtbegin(funcName());
+            try { 
+                if (runWorker.IsBusy || programState == PROGRAM_STATE.RUNNING || currProg == null || currFunc == null || currStmt == null || currInst == null) {
+                    debugOut("runWorker.IsBusy || programState == PROGRAM_STATE.RUNNING || currProg == null || currFunc == null || currStmt == null || currInst == null");
+                    dtend();
+                    return;
+                } // if
+                programState = PROGRAM_STATE.RUNINST;
+                uiFunctionRun.Enabled = !uiFunctionRun.Enabled;
+                uiProgRun.Enabled = !uiProgRun.Enabled;
+                callStack = new Stack<Tuple<FuncName, StmtLabel, RetVal, List<string>>>();
+                argStack = new Stack<VarName>();
+                uiImageLibrary.Visible = false;
+                runWorker.RunWorkerAsync(currInst);
+                uiImageLibrary.Visible = true;
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
+            dtend();
+        } // uiInstRunButtonClicked
+        internal void uiFuncRunClicked(object sender, EventArgs e) {
+            dtbegin(funcName());
+            try { 
+                if (programState == PROGRAM_STATE.RUNNING || currProg == null || currFunc == null) {
+                    debugOut("programState == PROGRAM_STATE.RUNNING || currProg == null || currFunc == null");
+                    dtend();
+                    return;
+                } // if
+                if (uiStmtList.Items.Count == 0) {
+                    debugOut("uiStmtList.Items.Count == 0");
+                    dtend();
+                    return;
+                } // if
+                resetRunContext();
                 programState = PROGRAM_STATE.RUNNING;
                 uiFunctionRun.Enabled = !uiFunctionRun.Enabled;
                 uiProgRun.Enabled = !uiProgRun.Enabled;
                 callStack = new Stack<Tuple<FuncName, StmtLabel, RetVal, List<string>>>();
-                foreach (Function func in currProg.funcList)
-                {
-                    if (func.funcName == "Main")
-                    {
-                        uiFuncList.SelectedItem = "Main";
-                        //Cursor.Hide();
-                        debugOut("Run func: " + currFunc.funcName);
-                        if (uiStmtList.Items.Count != 0)
-                        {
-                            uiStmtList.SelectedIndex = 0;
-                            uiInstList.SelectedIndex = uiInstList.Items.Count == 0 ? -1 : 0;
-                            debugOut("Run stmt: " + currStmt.stmtLabel);
-                            runWorker.RunWorkerAsync(currInst);
-                        }
-                        else
-                        {
-                            debugOut("Function is empty");
-                        } // if
-                        dtend();
-                        return;
-                    } // if
-                } // foreach
-                uiStatusLabel.Text = "Could not find function 'Main'.";
-            } // if
-            dtend();
-        } // function uiProgRunClicked
-        private void uiFuncRunClicked(object sender, EventArgs e) {
-            dtbegin(funcName());
-            if (programState == PROGRAM_STATE.RUNNING || currProg == null || currFunc == null)
-            {
-                debugOut("programState == PROGRAM_STATE.RUNNING || currProg == null || currFunc == null");
-                dtend();
-                return;
-            } // if
-            if (uiStmtList.Items.Count == 0) {
-                debugOut("uiStmtList.Items.Count == 0");
-                dtend();
-                return;
-            } // if
-            programState = PROGRAM_STATE.RUNNING;
-            uiFunctionRun.Enabled = !uiFunctionRun.Enabled;
-            uiProgRun.Enabled = !uiProgRun.Enabled;
-            callStack = new Stack<Tuple<FuncName, StmtLabel, RetVal, List<string>>>();
-            argStack = new Stack<VarName>();
-            uiStmtList.SelectedIndex = 0;
-            uiInstList.SelectedIndex = uiInstList.Items.Count == 0 ? -1 : 0;
-            //Cursor.Hide();
-            uiStatusLabel.Text = "Program running...";
-            debugOut("Run stmt: " + currStmt.text);
-            runWorker.RunWorkerAsync(currInst);
+                argStack = new Stack<VarName>();
+                uiStmtList.SelectedIndex = 0;
+                uiInstList.SelectedIndex = uiInstList.Items.Count == 0 ? -1 : 0;
+                //Cursor.Hide();
+                uiStatusLabel.Text = "Program running...";
+                debugOut("Run stmt: " + currStmt.text);
+                runWorker.RunWorkerAsync(currInst);
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
             dtend();
         } // function uiFunctionRunClick
-        void processCmpImage(string imageName, bool isCopyClipboard, ImageVar _iv = null) {
+        internal void processCmpImage(string imageName, bool isCopyClipboard, ImageVar _iv = null) {
             dtbegin(funcName());
-            imageName = substituteVars(imageName);
-            debugOut($"Subsituted image name is {imageName}");
-            List<ImageVar> ivs = null;
-            if (_iv == null)
-            {
-                ivs = folder.imageLibrary.findImage(imageName);
-            } else
-            {
-                ivs = new List<ImageVar>();
-                ivs.Add(_iv);
-            }
             Bitmap screenBitmap = null;
             Graphics screenGraphics = null;
-            if (ivs.Count == 0) {
-                runContext.currCond = STMT_CONDITIONS.EQ;
-            } else { // check for match if at least one of the images match
-                runContext.currCond = STMT_CONDITIONS.NE;
-                ImageVar iv0 = ivs[0];
-                screenBitmap = new Bitmap(1920, 1080, iv0.image.PixelFormat);
-                screenGraphics = Graphics.FromImage(screenBitmap);
-                screenGraphics.CopyFromScreen(0, 0, 0, 0, new Size(1920, 1080), CopyPixelOperation.SourceCopy);
-                foreach (ImageVar iv in ivs) {
-                    if (!iv.isOCRRectBox && processCmpImage(iv)) {
-                        break;
-                    } // if
-                    if (iv.isOCRRectBox && isCopyClipboard &&  processCmpBoxCopy(iv)) {
-                        break;
-                    } // if
-                    if (iv.isOCRRectBox && processCmpBox(iv)) {
-                        break;
-                    } // if
-                } // foreach
-            } // if
+            List<ImageVar> ivs = null;
+            var fullScreenRect = new Rectangle(0, 0, 1920, 1080);
+            try { 
+                if (_iv == null) {
+                    imageName = substituteVars(imageName);
+                    debugOut($"Subsituted image name is {imageName}");
+                    ivs = folder.imageLibrary.findImage(imageName);
+                } else {
+                    ivs = new List<ImageVar>();
+                    ivs.Add(_iv);
+                } // if
+                if (ivs.Count == 0) {
+                    runContext.currCond = STMT_CONDITIONS.EQ;
+                } else { // check for match if at least one of the images match
+                    runContext.currCond = STMT_CONDITIONS.NE;
+                    ImageVar iv0 = ivs[0];
+                    screenBitmap = new Bitmap(1920, 1080, iv0.image.PixelFormat);
+                    screenGraphics = Graphics.FromImage(screenBitmap);
+                    screenGraphics.CopyFromScreen(0, 0, 0, 0, new Size(1920, 1080), CopyPixelOperation.SourceCopy);
+                    foreach (ImageVar iv in ivs) {
+                        if (iv.OCRRectBR != iv.OCRRectTL && iv.isOCRRectBox && isCopyClipboard) {
+                            if (processCmpBox(iv, false)) {
+                                runContext.currCond = STMT_CONDITIONS.EQ;
+                                break;
+                            } // if
+                        } // if
+                        if (iv.OCRRectBR != iv.OCRRectTL) {
+                            if (processCmpBox(iv, iv.isOCRRectBox)) {
+                                runContext.currCond = STMT_CONDITIONS.EQ;
+                                break;
+                            } // if
+                        } // if
+                        if (searchImage(iv)) {
+                            runContext.currCond = STMT_CONDITIONS.EQ;
+                            break;
+                        } // if
+                    } // foreach
+                } // if
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
             string doOCR(Image<Bgr, Byte> searchImg, ImageVar iv) {
                 try {
                     if (iv.OCRParams == null) iv.OCRParams = "1,-1,-1,-1,-1";
@@ -608,11 +764,9 @@ namespace AIScreenAutomationApp
                     } // if
                     if (int.Parse(parameters[4]) != -1) {
                         if (int.Parse(parameters[3]) == 1) {
-                            ocrImageGray = ocrImageGray.ThresholdBinaryInv(new Gray(int.Parse(parameters[4])),
-                            new Gray(255));
+                            ocrImageGray = ocrImageGray.ThresholdBinaryInv(new Gray(int.Parse(parameters[4])), new Gray(255));
                         } else {
-                            ocrImageGray = ocrImageGray.ThresholdBinary(new Gray(int.Parse(parameters[4])),
-                            new Gray(255));
+                            ocrImageGray = ocrImageGray.ThresholdBinary(new Gray(int.Parse(parameters[4])), new Gray(255));
                         } // if
                     } // if
                     Pix pix = PixConverter.ToPix(ocrImageGray.AsBitmap<Gray, Byte>());
@@ -627,359 +781,461 @@ namespace AIScreenAutomationApp
                 } // try
                 return "";
             } // doOCR
-            STMT_CONDITIONS doSearchXYWH(Image<Bgr, Byte> searchImg, ImageVar iv, int x, int y, int w, int h, int _marginSize) {
-                STMT_CONDITIONS retVal = STMT_CONDITIONS.NE;
-                x = Math.Min(1920, Math.Max(0, x));
-                y = Math.Min(1080, Math.Max(0, y));
-                w = Math.Min(1920-x, Math.Max(0, w));
-                h = Math.Min(1080-y, Math.Max(0, h));
-                Rectangle srcRect = new Rectangle(x, y, w, h);
-                Bitmap screenPart = screenBitmap.Clone(srcRect, iv.image.PixelFormat);
-                Image<Bgr, Byte> screenImg = screenPart.ToImage<Bgr, byte>();
-                if (w != 1980) runContext.imagesCaptured["debug-search-image"] = screenPart;
-                Image<Gray, float> matchImg = screenImg.MatchTemplate(searchImg, TemplateMatchingType.CcoeffNormed);
-                matchImg.MinMax(out minValues, out maxValues, out minLocations, out maxLocations);
-                for (int c = 1; c < maxValues.Length; c++) { // select the left most match
-                    if (maxLocations[c].X < maxLocations[0].X) {
-                        maxLocations[0].X = maxLocations[c].X;
-                        maxLocations[0].Y = maxLocations[c].Y;
-                        maxValues[0] = maxValues[c];
+            bool doSearchXYWH(Image<Bgr, Byte> searchImg, ImageVar iv, Rectangle srcRect, out Point matchLoc) {
+                bool retVal = false;
+                matchLoc = Point.Empty;
+                try { 
+                    iv.matchThreshold = iv.matchThreshold.Replace(',', '.'); // TODO: fix culture.
+                    float matchTreshold = float.Parse(iv.matchThreshold, CultureInfo.InvariantCulture);
+                    runContext.vars["debug-matchTreshold"] = iv.matchThreshold;
+                    srcRect.X = Math.Min(1920, Math.Max(0, srcRect.X));
+                    srcRect.Y = Math.Min(1080, Math.Max(0, srcRect.Y));
+                    srcRect.Width = Math.Min(1920-srcRect.X, Math.Max(0, srcRect.Width));
+                    srcRect.Height = Math.Min(1080-srcRect.Y, Math.Max(0, srcRect.Height));
+                    Bitmap screenPart = screenBitmap.Clone(srcRect, iv.image.PixelFormat);
+                    Image<Bgr, Byte> screenImg = screenPart.ToImage<Bgr, byte>();
+                    if (srcRect.X != 1980) runContext.imagesCaptured["debug-search-image"] = screenPart;
+                    Image<Gray, float> matchImg = screenImg.MatchTemplate(searchImg, TemplateMatchingType.CcoeffNormed);
+                    Image<Gray, float> matchesImg = matchImg.Convert((value) => { return value >= matchTreshold ? 1.0f : 0.0f;  });
+                    runContext.imagesCaptured["debug-matchImg"] = matchImg.Convert<Gray,Byte>().ToBitmap();
+                    runContext.imagesCaptured["debug-matchesImg"] = matchesImg.Convert<Gray,Byte>().ToBitmap();
+                    matchesImg.MinMax(out minValues, out maxValues, out minLocations, out maxLocations);
+                    for (int c = 1; c < maxValues.Length; c++) { // select the left most match
+                        if (maxLocations[c].X < maxLocations[0].X) {
+                            maxLocations[0].X = maxLocations[c].X;
+                            maxLocations[0].Y = maxLocations[c].Y;
+                            maxValues[0] = maxValues[c];
+                        } // if
+                    } // for
+                    runContext.maxValue = maxValues[0];
+                    if (maxValues[0] >= matchTreshold) {
+                        debugOut($"runLoop match val: {maxValues[0]}");
+                        retVal = true;
+                        matchLoc = new Point(maxLocations[0].X + srcRect.X, maxLocations[0].Y + srcRect.Y);
+                        runContext.actionOffsetPt.X = iv.actionOffsetPt.X;
+                        runContext.actionOffsetPt.Y = iv.actionOffsetPt.Y;
                     } // if
-                } // for
-                runContext.maxValue = maxValues[0];
-                iv.matchThreshold = iv.matchThreshold.Replace(',', '.'); // TODO: fix culture.
-                if (maxValues[0] > float.Parse(iv.matchThreshold, CultureInfo.InvariantCulture)) {
-                    debugOut($"runLoop match val: {maxValues[0]}");
-                    retVal = STMT_CONDITIONS.EQ;
-                    runContext.screenMatchLoc.X = maxLocations[0].X + x;
-                    runContext.screenMatchLoc.Y = maxLocations[0].Y + y;
-                    runContext.actionOffsetPt.X = iv.actionOffsetPt.X;
-                    runContext.actionOffsetPt.Y = iv.actionOffsetPt.Y;
-                } // if
+                } catch (Exception ex) {
+                    uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+                } // try
                 return retVal;
             } // function doSearchXYWH
-            bool processCmpImage(ImageVar iv) {
+            bool searchImage(ImageVar iv) {
                 dtbegin(funcName());
-                Bitmap searchBitmap = new Bitmap(iv.image);
-                if (iv.searchRectBR != iv.searchRectTL) {
-                    int top = iv.searchRectTL.Y;
-                    int left = iv.searchRectTL.X;
-                    int bottom = iv.searchRectBR.Y;
-                    int right = iv.searchRectBR.X;
-                    if (left > right) (left, right) = (right, left);
-                    if (top > bottom) (top, bottom) = (bottom, top);
-                    var rect = new Rectangle(left, top, Math.Abs(left - right), Math.Abs(top - bottom));
-                    rect.Width = Math.Min(rect.Width, iv.image.Width - rect.Left);
-                    rect.Height= Math.Min(rect.Height, iv.image.Height - rect.Top);
-                    searchBitmap = searchBitmap.Clone(rect, iv.image.PixelFormat);
-                } // if
-                Image<Bgr, Byte> searchImg = searchBitmap.ToImage<Bgr, byte>();
-                runContext.imagesCaptured["debug-processCmpImage"] = searchBitmap;
-                runContext.currCond = doSearchXYWH(searchImg, iv, 0, 0, 1920, 1080, 0);
-                debugOut($"Compare image match: {runContext.currCond}");
+                bool retVal = false;
+                try {
+                    Bitmap searchBitmap = new Bitmap(iv.image);
+                    if (iv.searchRectBR != iv.searchRectTL) {
+                        int top = iv.searchRectTL.Y;
+                        int left = iv.searchRectTL.X;
+                        int bottom = iv.searchRectBR.Y;
+                        int right = iv.searchRectBR.X;
+                        if (left > right) (left, right) = (right, left);
+                        if (top > bottom) (top, bottom) = (bottom, top);
+                        var rect = new Rectangle(left, top, Math.Abs(left - right), Math.Abs(top - bottom));
+                        rect.Width = Math.Min(rect.Width, iv.image.Width - rect.Left);
+                        rect.Height= Math.Min(rect.Height, iv.image.Height - rect.Top);
+                        searchBitmap = searchBitmap.Clone(rect, iv.image.PixelFormat);
+                    } // if
+                    Image<Bgr, Byte> searchImg = searchBitmap.ToImage<Bgr, byte>();
+                    runContext.imagesCaptured["debug-processCmpImage"] = searchBitmap;
+                    retVal = doSearchXYWH(searchImg, iv, fullScreenRect, out runContext.screenMatchLoc);
+                    debugOut($"Compare image match: {runContext.currCond}");
+                } catch (Exception ex) {
+                    uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+                } // try
                 dtend();
-                return runContext.currCond != STMT_CONDITIONS.NE;
-            } // processCmpImage
-            bool processCmpBoxCopy(ImageVar iv) {
-                return processCmpBox(iv, true);
-            } // processCmpBoxCopy
+                return retVal;
+            } // searchImage
             bool processCmpBox(ImageVar iv, bool isCopy = false) {
                 dtbegin(funcName());
-                Bitmap searchBitmap = new Bitmap(iv.image);
-                Bitmap searchBitmapLeft = new Bitmap(iv.image);
-                Bitmap searchBitmapRight = new Bitmap(iv.image);
-                Bitmap searchBitmapOCRBox = new Bitmap(iv.image);
-                if (iv.OCRRectBR == iv.OCRRectTL) {
-                    debugOut($"Compare image match: {runContext.currCond}");
-                    dtend();
-                    return false;
-                } // if
-                int top = iv.OCRRectTL.Y;
-                int left = iv.OCRRectTL.X;
-                int bottom = iv.OCRRectBR.Y;
-                int right = iv.OCRRectBR.X;
-                if (left > right) (left, right) = (right, left);
-                if (top > bottom) (top, bottom) = (bottom, top);
-                var rectLeft = new Rectangle(0, 0, left, iv.image.Height);
-                var rectRight = new Rectangle(right, 0, iv.image.Width - right, iv.image.Height);
-                rectLeft.Width = Math.Min(rectLeft.Width, iv.image.Width);
-                rectLeft.Height= Math.Min(rectLeft.Height, iv.image.Height);
-                rectRight.Width = Math.Min(rectRight.Width, iv.image.Width);
-                rectRight.Height= Math.Min(rectRight.Height, iv.image.Height);
-                searchBitmapLeft = searchBitmap.Clone(rectLeft, iv.image.PixelFormat);
-                searchBitmapRight = searchBitmap.Clone(rectRight, iv.image.PixelFormat);
-                Image<Bgr, Byte> searchImg = searchBitmapLeft.ToImage<Bgr, byte>();
-                runContext.imagesCaptured["debug-processCmpBox-left"] = searchBitmapLeft;
-                runContext.currCond = doSearchXYWH(searchImg, iv, 0, 0, 1920, 1080, 0);
-                if (runContext.currCond == STMT_CONDITIONS.EQ) { // search right image
-                    Image<Bgr, Byte> searchImgRight = searchBitmapRight.ToImage<Bgr, byte>();
-                    var leftMatchPt = new Point((Size)runContext.screenMatchLoc);
+                bool imgMatched = false;
+                try {
+                    Bitmap searchBitmap = new Bitmap(iv.image);
+                    Bitmap searchBitmapLeft = new Bitmap(iv.image);
+                    Bitmap searchBitmapRight = new Bitmap(iv.image);
+                    Bitmap searchBitmapOCRBox = new Bitmap(iv.image);
+                    if (iv.OCRRectBR == iv.OCRRectTL) {
+                        debugOut($"Compare image match: {runContext.currCond}");
+                        dtend();
+                        return false;
+                    } // if
+                    if (iv.OCRRectTL.X > iv.OCRRectBR.X) (iv.OCRRectTL.X, iv.OCRRectBR.X) = (iv.OCRRectBR.X, iv.OCRRectTL.X);
+                    if (iv.OCRRectTL.Y > iv.OCRRectBR.Y) (iv.OCRRectTL.Y, iv.OCRRectBR.Y) = (iv.OCRRectBR.Y, iv.OCRRectTL.Y);
+                    int ocrBoxTop = iv.OCRRectTL.Y;
+                    int ocrBoxLeft = iv.OCRRectTL.X;
+                    int ocrBoxBottom = iv.OCRRectBR.Y;
+                    int ocrBoxRight = iv.OCRRectBR.X;
+                    var rectLeftOfOCRBox = new Rectangle(0, 0, ocrBoxLeft, iv.image.Height);
+                    var rectRightOfOCRBox = new Rectangle(ocrBoxRight, 0, iv.image.Width - ocrBoxRight, iv.image.Height);
+                    rectLeftOfOCRBox.Width = Math.Min(rectLeftOfOCRBox.Width, iv.image.Width);
+                    rectLeftOfOCRBox.Height= Math.Min(rectLeftOfOCRBox.Height, iv.image.Height);
+                    rectRightOfOCRBox.Width = Math.Min(rectRightOfOCRBox.Width, iv.image.Width);
+                    rectRightOfOCRBox.Height= Math.Min(rectRightOfOCRBox.Height, iv.image.Height);
+                    searchBitmapLeft = searchBitmap.Clone(rectLeftOfOCRBox, iv.image.PixelFormat);
+                    searchBitmapRight = searchBitmap.Clone(rectRightOfOCRBox, iv.image.PixelFormat);
+                    runContext.imagesCaptured["debug-processCmpBox-left"] = searchBitmapLeft;
                     runContext.imagesCaptured["debug-processCmpBox-right"] = searchBitmapRight;
-                    runContext.currCond = doSearchXYWH(searchImgRight, iv, leftMatchPt.X, leftMatchPt.Y, 
-                        1920-leftMatchPt.X, iv.image.Height, 0);
-                    if (runContext.currCond == STMT_CONDITIONS.EQ) { // create Box image and do OCR
-                        var rectOCRBox = new Rectangle(leftMatchPt.X + left, leftMatchPt.Y + top,
-                            runContext.screenMatchLoc.X - (leftMatchPt.X + left), bottom - top);
-                        debugOut($"OCRBox: {rectOCRBox.X},{rectOCRBox.Y},{rectOCRBox.Width},{rectOCRBox.Height}");
-                        if (!isCopy) {
-                            searchBitmapOCRBox = screenBitmap.Clone(rectOCRBox, iv.image.PixelFormat);
-                            Image<Bgr, Byte> searchBitmapOCRBoxImage = searchBitmapOCRBox.ToImage<Bgr, byte>();
-                            runContext.ocrOut = doOCR(searchBitmapOCRBoxImage, iv);
-                            debugOut($"OCR result = {runContext.ocrOut}");
-                        } else {
-                            runContext.copyClipboardRect = rectOCRBox;
+                    Image<Bgr, Byte> searchImg = searchBitmapLeft.ToImage<Bgr, byte>();
+                    var screenLeftMatchPt = Point.Empty;
+                    imgMatched = doSearchXYWH(searchImg, iv, fullScreenRect, out screenLeftMatchPt);
+                    if (!isCopy) {
+                        updateVariableTableRow("ocrOut", "??", false, "Debug,All");
+                    } // if
+                    if (imgMatched) { // search right image
+                        Image<Bgr, Byte> searchImgRight = searchBitmapRight.ToImage<Bgr, byte>();
+                        Rectangle srcSearchRect = new Rectangle(
+                            /* x */ screenLeftMatchPt.X + searchBitmapLeft.Width,
+                            /* y */ screenLeftMatchPt.Y,
+                            /* w */ 1920-screenLeftMatchPt.X - searchBitmapLeft.Width,
+                            /* h */ iv.image.Height);
+                        var screenRightMatchPt = Point.Empty;
+                        imgMatched = doSearchXYWH(searchImgRight, iv, srcSearchRect, out screenRightMatchPt);
+                        runContext.matchSize.Width = -1;
+                        runContext.matchSize.Height = -1;
+                        if (imgMatched) { // create Box image and do OCR
+                            var rectOCRBox = new Rectangle();
+                            rectOCRBox.X = screenLeftMatchPt.X + searchBitmapLeft.Width;
+                            rectOCRBox.Y = screenLeftMatchPt.Y + ocrBoxTop;
+                            rectOCRBox.Width = screenRightMatchPt.X-(screenLeftMatchPt.X + searchBitmapLeft.Width);
+                            rectOCRBox.Height = Math.Abs(iv.OCRRectTL.Y - iv.OCRRectBR.Y);
+                            debugOut($"OCRBox: {rectOCRBox.X},{rectOCRBox.Y},{rectOCRBox.Width},{rectOCRBox.Height}");
+                            runContext.matchSize.Width = rectOCRBox.Width;
+                            runContext.matchSize.Height = rectOCRBox.Height;
+                            if (!isCopy) {
+                                searchBitmapOCRBox = screenBitmap.Clone(rectOCRBox, iv.image.PixelFormat);
+                                Image<Bgr, Byte> searchBitmapOCRBoxImage = searchBitmapOCRBox.ToImage<Bgr, byte>();
+                                runContext.vars["ocrOut"] = doOCR(searchBitmapOCRBoxImage, iv);
+                                runContext.imagesCaptured["debug-processCmpBox-ocr"] = searchBitmapOCRBox;
+                                updateVariableTableRow("ocrOut", runContext.vars["ocrOut"], false, "Debug,All");
+                                debugOut($"OCR result = {runContext.vars["ocrOut"]}");
+                            } else {
+                                runContext.copyClipboardRect = rectOCRBox;
+                            } // if
                         } // if
                     } // if
-                } // if
-                debugOut($"Compare box match: {runContext.currCond}");
+                    debugOut($"Compare box match: {runContext.currCond}");
+                } catch (Exception ex) {
+                    uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+                } // try
                 dtend();
-                return runContext.currCond != STMT_CONDITIONS.NE;
+                return imgMatched;
             } // processCmpBox
             dtend();
         } // function processCmpImage
-
         internal string substituteVars(string expression)
         { // search for {var-name} and replace it with its value
             dtbegin(funcName());
-            debugOut($"expression={expression}");
-            { // replace escape sequences
-                expression = Regex.Replace(expression, "{{", "Ö"); // TODO: fix this
-                expression = Regex.Replace(expression, "}}", "Ğ"); // TODO: fix this
-            } // block
-            var reString = "{.*?}";
-            Match m = Regex.Match(expression, reString);
-            while (m.Success) {
-                var variableName = m.Value.Substring(1, m.Value.Length - 2);
-                var colonIdx = variableName.IndexOf(':');
-                var insertIdx = variableName.IndexOf('<');
-                var removeIdx = variableName.IndexOf('>');
-                var numMatches = colonIdx != -1 ? 1 : 0;
-                numMatches = insertIdx != -1 ? numMatches + 1 : numMatches;
-                numMatches = removeIdx != -1 ? numMatches + 1 : numMatches;
-                if (insertIdx != -1) {
-                    uiStatusLabel.Text = "Error: < cannot be used in variables.";
-                    debugOut(uiStatusLabel.Text);
-                    programState = PROGRAM_STATE.STOP;
-                    break;
-                } // if
-                if (numMatches > 1) {
-                    uiStatusLabel.Text = "Error: Only  one of :,<,> can be used.";
-                    debugOut(uiStatusLabel.Text);
-                    programState = PROGRAM_STATE.STOP;
-                    break;
-                } // if
-                int paramIdx = -1;
-                if (variableName.StartsWith("p") && int.TryParse(variableName.Substring(1), out paramIdx)) {
-                    List<string> currParams = callStack.Peek().Item4;
-                    expression = Regex.Replace(expression, "{.*?}", currParams[paramIdx]);
-                    m = Regex.Match(expression, reString);
-                } else if (variableName == "retVal") {
-                    debugOut($"retVal matched");
-                    expression = Regex.Replace(expression, "{.*?}", runContext.retVal);
-                    m = Regex.Match(expression, reString);
-                } else if (variableName == "clipboard") {
-                    debugOut($"clipboard matched");
-                    var clipboard = "<null>";
-                    if (runContext.clipboard != null) clipboard = runContext.clipboard;
-                    expression = Regex.Replace(expression, "{.*?}", clipboard);
-                    m = Regex.Match(expression, reString);
-                } else if (variableName == "ocrOut") {
-                    debugOut($"ocrOut matched");
-                    var ocrOut = "<null>";
-                    if (runContext.ocrOut != null) ocrOut = runContext.ocrOut;
-                    expression = Regex.Replace(expression, "{.*?}", ocrOut);
-                    m = Regex.Match(expression, reString);
-                } else if (runContext.vars.ContainsKey(variableName)) {
-                    debugOut($"a variable is matched = {variableName}");
-                    string value = runContext.vars[variableName];
-                    expression = Regex.Replace(expression, "{.*?}", value);
-                    m = Regex.Match(expression, reString);
-                } else if (variableName[0] == '@' && numMatches == 0 && runContext.arrays.ContainsKey(variableName.Substring(1))) {
-                    var arrName = variableName.Substring(1);
-                    debugOut($"an array is matched = {arrName}");
-                    var value = "";
-                    foreach (var elem in runContext.arrays[variableName.Substring(1)]) {
-                        value += elem + ",";
-                    } // foreach
-                    value = value.Remove(value.Length - 1, 1);
-                    expression = Regex.Replace(expression, "{.*?}", value);
-                    m = Regex.Match(expression, reString);
-                } else if (variableName[0] == '@' && numMatches == 1) {
-                    var operatorIdx = colonIdx * insertIdx * removeIdx;
-                    // @arr[<>:]idx|front|back = case
-                    var arrName = variableName.Substring(1, operatorIdx - 1);
-                    var indexVar = variableName.Substring(operatorIdx + 1, variableName.Length - operatorIdx - 1);
-                    debugOut($"an array is matched with operator {arrName}");
-                    if (!runContext.arrays.ContainsKey(arrName)) {
-                        uiStatusLabel.Text = $"Error: array '{arrName}' not found @currInst?";
+            try { 
+                debugOut($"expression={expression}");
+                { // replace escape sequences
+                    expression = Regex.Replace(expression, "{{", "Ö"); // TODO: fix this
+                    expression = Regex.Replace(expression, "}}", "Ğ"); // TODO: fix this
+                } // block
+                var reString = "{.*?}";
+                Match m = Regex.Match(expression, reString);
+                while (m.Success) {
+                    var variableName = m.Value.Substring(1, m.Value.Length - 2);
+                    var colonIdx = variableName.IndexOf(':');
+                    var insertIdx = variableName.IndexOf('<');
+                    var removeIdx = variableName.IndexOf('>');
+                    var numMatches = colonIdx != -1 ? 1 : 0;
+                    numMatches = insertIdx != -1 ? numMatches + 1 : numMatches;
+                    numMatches = removeIdx != -1 ? numMatches + 1 : numMatches;
+                    if (insertIdx != -1) {
+                        uiStatusLabel.Text = "Error: < cannot be used in variables.";
                         debugOut(uiStatusLabel.Text);
                         programState = PROGRAM_STATE.STOP;
                         break;
                     } // if
-                    if (variableName.EndsWith("len")) {
-                        debugOut($"array length is matched");
-                        var length = $"{runContext.arrays[arrName].Count}";
-                        expression = Regex.Replace(expression, "{.*?}", length);
+                    if (numMatches > 1) {
+                        uiStatusLabel.Text = "Error: Only  one of :,<,> can be used.";
+                        debugOut(uiStatusLabel.Text);
+                        programState = PROGRAM_STATE.STOP;
+                        break;
+                    } // if
+                    int paramIdx = -1;
+                    if (variableName.StartsWith("p") && int.TryParse(variableName.Substring(1), out paramIdx)) {
+                        List<string> currParams = null;
+                        if (callStack.Count != 0) currParams = callStack.Peek().Item4;
+                        if (currParams != null && paramIdx >=0 && paramIdx < currParams.Count) {
+                            expression = Regex.Replace(expression, "{p" + paramIdx + "}", currParams[paramIdx]);
+                            m = Regex.Match(expression, reString);
+                        } else {
+                            if (runContext.vars.ContainsKey($"p{paramIdx}")) {
+                                expression = Regex.Replace(expression, "{p" + paramIdx + "}", runContext.vars[$"p{paramIdx}"]);
+                                m = Regex.Match(expression, reString);
+                            }  else { 
+                                if (currParams == null) {
+                                    uiStatusLabel.Text = $"Error: no params in stack using pn=<null> as value.";
+                                } else {
+                                    uiStatusLabel.Text = $"Error: parameter index {paramIdx} is out of range, using <null> value.";
+                                } // if
+                                debugOut(uiStatusLabel.Text);
+                                expression = Regex.Replace(expression, "{p" + paramIdx + "}", "<null>");
+                                m = Regex.Match(expression, reString);
+                            } // if
+                        } // if
+                    } else if (variableName == "comma") {
+                        debugOut($"comma matched");
+                        expression = Regex.Replace(expression, "{comma}", ",");
                         m = Regex.Match(expression, reString);
-                        continue;
-                    } else if (variableName.EndsWith("back")) {
-                        debugOut($"array back is matched");
-                        indexVar = $"{runContext.arrays[arrName].Count - 1}";
-                    } else if (variableName.EndsWith("front")) {
-                        debugOut($"array front is matched");
-                        indexVar = $"{0}";
+                    } else if (variableName == "at") {
+                        debugOut($"at@ matched");
+                        expression = Regex.Replace(expression, "{at}", "@");
+                        m = Regex.Match(expression, reString);
+                    } else if (variableName == "clipboard") {
+                        debugOut($"clipboard matched");
+                        var clipboard = "<null>";
+                        if (runContext.clipboard != null) clipboard = runContext.clipboard;
+                        expression = Regex.Replace(expression, "{clipboard}", clipboard);
+                        m = Regex.Match(expression, reString);
+                    } else if (variableName == "clipboard-text") {
+                        debugOut($"clipboard-text matched");
+                        var clipboard = "";
+                        try {
+                            if (Clipboard.ContainsText()) clipboard = Clipboard.GetText();
+                        } catch (Exception) { }
+                        expression = Regex.Replace(expression, "{clipboard-text}", clipboard);
+                        m = Regex.Match(expression, reString);
+                    } else if (runContext.vars.ContainsKey(variableName)) {
+                        debugOut($"a variable is matched = {variableName}");
+                        string value = runContext.vars[variableName];
+                        var regex = new Regex("{" + variableName + "}");
+                        expression = regex.Replace(expression, value, 1);
+                        m = Regex.Match(expression, reString);
+                    } else if (variableName[0] == '@' && numMatches == 0 && runContext.arrays.ContainsKey(variableName.Substring(1))) {
+                        var arrName = variableName.Substring(1);
+                        debugOut($"an array is matched = {arrName}");
+                        var value = "";
+                        foreach (var elem in runContext.arrays[variableName.Substring(1)]) {
+                            value += elem + ",";
+                        } // foreach
+                        value = value.Remove(value.Length - 1, 1);
+                        var regex = new Regex("{" + variableName + "}");
+                        expression = regex.Replace(expression, value, 1);
+                        m = Regex.Match(expression, reString);
+                    } else if (variableName[0] == '@' && numMatches == 1) {
+                        var operatorIdx = colonIdx * insertIdx * removeIdx;
+                        // @arr[<>:]idx|front|back = case
+                        var arrName = variableName.Substring(1, operatorIdx - 1);
+                        var indexVar = variableName.Substring(operatorIdx + 1, variableName.Length - operatorIdx - 1);
+                        debugOut($"an array is matched with operator {arrName}");
+                        if (!runContext.arrays.ContainsKey(arrName)) {
+                            uiStatusLabel.Text = $"Error: array '{arrName}' not found @currInst?";
+                            debugOut(uiStatusLabel.Text);
+                            programState = PROGRAM_STATE.STOP;
+                            break;
+                        } // if
+                        if (variableName.EndsWith("len")) {
+                            debugOut($"array length is matched");
+                            var length = $"{runContext.arrays[arrName].Count}";
+                            expression = Regex.Replace(expression, "{.*?:len}", length);
+                            m = Regex.Match(expression, reString);
+                            continue;
+                        } else if (variableName.EndsWith("back")) {
+                            debugOut($"array back is matched");
+                            indexVar = $"{runContext.arrays[arrName].Count - 1}";
+                        } else if (variableName.EndsWith("front")) {
+                            debugOut($"array front is matched");
+                            indexVar = $"{0}";
+                        } // if
+                        var elemIdx = int.Parse(substituteVars(indexVar));
+                        if (elemIdx < 0 || elemIdx >= runContext.arrays[arrName].Count) {
+                            uiStatusLabel.Text = $"Error: array index out of range @currInst?";
+                            debugOut(uiStatusLabel.Text);
+                            programState = PROGRAM_STATE.STOP;
+                            break;
+                        } // if
+                        var value = runContext.arrays[arrName][elemIdx];
+                        if (removeIdx != -1) { // remove the element at elemIdx
+                            debugOut($"array removing element at {elemIdx}");
+                            runContext.arrays[arrName].RemoveAt(elemIdx);
+                        } // if
+                        expression = Regex.Replace(expression, "{.*?}", value);
+                        m = Regex.Match(expression, reString);
+                    } else {
+                        debugOut($"Variable {variableName} not found value is <null>.");
+                        expression = Regex.Replace(expression, "{.*?}", "<null>");
+                        m = Regex.Match(expression, reString);
                     } // if
-                    var elemIdx = int.Parse(substituteVars(indexVar));
-                    if (elemIdx < 0 || elemIdx >= runContext.arrays[arrName].Count) {
-                        uiStatusLabel.Text = $"Error: array index out of range @currInst?";
-                        debugOut(uiStatusLabel.Text);
-                        programState = PROGRAM_STATE.STOP;
-                        break;
-                    } // if
-                    var value = runContext.arrays[arrName][elemIdx];
-                    if (removeIdx != -1)
-                    { // remove the element at elemIdx
-                        debugOut($"array removing element at {elemIdx}");
-                        runContext.arrays[arrName].RemoveAt(elemIdx);
-                    } // if
-                    expression = Regex.Replace(expression, "{.*?}", value);
-                    m = Regex.Match(expression, reString);
-                } else {
-                    debugOut($"Variable {variableName} not found value is <null>.");
-                    expression = Regex.Replace(expression, "{.*?}", "<null>");
-                    m = Regex.Match(expression, reString);
-                } // if
-            } // while
-            { // replace back escape sequences
-                expression = Regex.Replace(expression, "Ö", "{"); // TODO: fix this
-                expression = Regex.Replace(expression, "Ğ", "}"); // TODO: fix this
-            } // block
+                } // while
+                { // replace back escape sequences
+                    expression = Regex.Replace(expression, "Ö", "{"); // TODO: fix this
+                    expression = Regex.Replace(expression, "Ğ", "}"); // TODO: fix this
+                } // block
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
             dtend();
             return expression;
         } // substituteVars
-
         internal void runInst(object sender, DoWorkEventArgs f) {
             dtbegin(funcName());
-            Instruction currInst = (Instruction)f.Argument;
-            debugOut($"runInst begin@ inst: {currInst?.text}");
-            runContext.imagesCaptured.Clear();
-            if (currInst?.instructionType == InstructionType.SAT_CMPIMG ||
-                currInst?.instructionType == InstructionType.SAT_CMPBOX ||
-                currInst?.instructionType == InstructionType.SAT_CMPBOXCOPY)
-            {
-                if (!currInst.isCommentedOut) {
-                    processCmpImage(currInst.instParamLeft, currInst?.instructionType == InstructionType.SAT_CMPBOXCOPY);
+            try { 
+                Instruction currInst = (Instruction)f.Argument;
+                debugOut($"runInst begin@ inst: {currInst?.text}");
+                runContext.imagesCaptured.Clear();
+                if (currInst != null && currInst.isCmpImgInst) {
+                    if (!currInst.isCommentedOut) {
+                        processCmpImage(currInst.instParamLeft, currInst?.instructionType == InstructionType.SAT_CMPBOXCOPY);
+                    } // if
                 } // if
-            } // if
-            debugOut($"runInst end");
+                debugOut($"runInst end");
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
             dtend();
         } // function runInst
         public void runInstFinished(object sender, RunWorkerCompletedEventArgs e) {
             dtbegin(funcName());
-            //    debugOut("Compare image match: " + currCond + " @ x=" + currStmt.cmpInstruction.screenLoc.X.ToString() +
-            //                ", y=" + currStmt.cmpInstruction.screenLoc.Y.ToString());
-            foreach (var item in runContext.imagesCaptured) {
-                putImage(item.Key, new Bitmap (item.Value));
-            } // foreach
-            if (programState == PROGRAM_STATE.STOP) {
-                debugOut("Program being stopped." + Environment.NewLine);
-                uiStatusLabel.Text = "Program stopped.";
-                dtend();
-                return;
-            } // if
-            if (currFunc != null && currStmt != null) {
-                while (currInst != null) {
-                    bool condOk = runContext.currCond == STMT_CONDITIONS.LT && currInst.instCondition == STMT_CONDITIONS.LE;
-                    condOk |= runContext.currCond == STMT_CONDITIONS.EQ && currInst.instCondition == STMT_CONDITIONS.LE;
-                    condOk |= runContext.currCond == STMT_CONDITIONS.EQ && currInst.instCondition == STMT_CONDITIONS.GE;
-                    condOk |= runContext.currCond == STMT_CONDITIONS.GT && currInst.instCondition == STMT_CONDITIONS.GE;
-                    condOk |= runContext.currCond == STMT_CONDITIONS.GT && currInst.instCondition == STMT_CONDITIONS.NE;
-                    condOk |= runContext.currCond == STMT_CONDITIONS.LT && currInst.instCondition == STMT_CONDITIONS.NE;
-                    if (!currInst.isCommentedOut) { 
-                        if (condOk || currInst.instCondition == runContext.currCond || currInst.instCondition == STMT_CONDITIONS.AL) {
-                            debugOut("---- Inst: " + currInst.ToString());
-                            if (!currInst.ExecInstContinue(currStmt)) {
-                                // runFinished();
-                                dtend();
-                                return;
-                            } // if
-                            if (currInst.isCallOrJumpInst()) {
-                                dtend();
-                                return;
+            try { 
+                //    debugOut("Compare image match: " + currCond + " @ x=" + currStmt.cmpInstruction.screenLoc.X.ToString() +
+                //                ", y=" + currStmt.cmpInstruction.screenLoc.Y.ToString());
+                updateVariableTableRow("screenMatchLoc", $"{runContext.screenMatchLoc.X}, {runContext.screenMatchLoc.Y}", false, "Debug");
+                updateVariableTableRow("screenMatchSize", $"{runContext.matchSize.Width}, {runContext.matchSize.Height}", false, "Debug");
+                foreach (var item in runContext.imagesCaptured) {
+                    putImage(item.Key, new Bitmap (item.Value));
+                } // foreach
+                bool shouldStop = programState == PROGRAM_STATE.STOP;
+                if (currInst != null && !currInst.isCommentedOut && currInst.isCmpImgInst && programState == PROGRAM_STATE.RUNINST) { 
+                    shouldStop = true;
+                } // if
+                if (shouldStop) {
+                    if (uiInstList.SelectedIndex != uiInstList.Items.Count - 1) { 
+                        uiInstList.SelectedIndex++;
+                    } // if
+                    debugOut("Program being stopped." + Environment.NewLine);
+                    uiStatusLabel.Text = "Program stopped.";
+                    uiProgRun.Enabled = true;
+                    uiFunctionRun.Enabled = true;
+                    uiProgRun.Enabled = true;
+                    dtend();
+                    return;
+                } // if
+                if (currFunc != null && currStmt != null) {
+                    while (currInst != null) {
+                        bool condOk = runContext.currCond == STMT_CONDITIONS.LT && currInst.instCondition == STMT_CONDITIONS.LE;
+                        condOk |= runContext.currCond == STMT_CONDITIONS.EQ && currInst.instCondition == STMT_CONDITIONS.LE;
+                        condOk |= runContext.currCond == STMT_CONDITIONS.EQ && currInst.instCondition == STMT_CONDITIONS.GE;
+                        condOk |= runContext.currCond == STMT_CONDITIONS.GT && currInst.instCondition == STMT_CONDITIONS.GE;
+                        condOk |= runContext.currCond == STMT_CONDITIONS.GT && currInst.instCondition == STMT_CONDITIONS.NE;
+                        condOk |= runContext.currCond == STMT_CONDITIONS.LT && currInst.instCondition == STMT_CONDITIONS.NE;
+                        if (!currInst.isCommentedOut) { 
+                            if (condOk || currInst.instCondition == runContext.currCond || currInst.instCondition == STMT_CONDITIONS.AL) {
+                                debugOut("---- Inst: " + currInst.ToString());
+                                if (!currInst.ExecInstContinue(currStmt)) {
+                                    // runFinished();
+                                    dtend();
+                                    return;
+                                } // if
+                                if (currInst.isCallOrJumpInst()) {
+                                    dtend();
+                                    return;
+                                } // if
                             } // if
                         } // if
+                        if (uiInstList.SelectedIndex == uiInstList.Items.Count - 1) break;
+                        uiInstList.SelectedIndex++;
+                        if (programState == PROGRAM_STATE.STEPINST) {
+                            dtend();
+                            return;
+                        } // if
+                        if (programState == PROGRAM_STATE.RUNINST) {
+                            programState = PROGRAM_STATE.STOP;
+                            if (callStack.Count != 0) {
+                                var caller = callStack.Pop();
+                                runContext.vars["retVal"] = caller.Item3;
+                                uiFuncList.Text = caller.Item1;
+                                updateStmtUI(caller.Item1);
+                                uiStmtList.Text = caller.Item2;
+                            } // if
+                            uiProgRun.Enabled = true;
+                            uiFunctionRun.Enabled = true;
+                            uiProgRun.Enabled = true;
+                            if (runContext.vars["retVal"] != null) {
+                                updateVariableTableRow($"retVal", runContext.vars["retVal"], false, "All,Debug");
+                            } // if
+                            uiStatusLabel.Text = "Program stopped.";
+                            return;
+                        } // if
+                    } // while
+                    if (uiStmtList.SelectedIndex != uiStmtList.Items.Count - 1)
+                    { // fallthrough case, run next statement
+                        runNextStatement();
+                    } else {
+                        runFinished();
                     } // if
-                    if (uiInstList.SelectedIndex == uiInstList.Items.Count - 1) break;
-                    uiInstList.SelectedIndex++;
-                } // while
-                if (uiStmtList.SelectedIndex != uiStmtList.Items.Count - 1)
-                { // fallthrough case, run next statement
-                    runNextStatement();
-                } else {
-                    runFinished();
                 } // if
-            } // if
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
             dtend();
         } // function runInstFinished
         internal void runNextStatement() {
             dtbegin(funcName());
-            if (uiStmtList.SelectedIndex != uiStmtList.Items.Count - 1) {
-                uiStmtList.SelectedIndex = uiStmtList.SelectedIndex + 1;
-                if (currStmt.isCommentedOut)
-                {
-                    runNextStatement();
-                    dtend();
-                    return;
-                }
-                uiInstList.SelectedIndex = uiInstList.Items.Count == 0 ? -1 : 0;
-                debugOut("-- stmt:" + currStmt.stmtLabel);
-                runWorker.RunWorkerAsync(currInst);
-            } else {
-                runFinished();
-            } // if
+            try {
+                if (uiStmtList.SelectedIndex != uiStmtList.Items.Count - 1) {
+                    uiStmtList.SelectedIndex = uiStmtList.SelectedIndex + 1;
+                    if (currStmt.isCommentedOut) {
+                        runNextStatement();
+                        dtend();
+                        return;
+                    } // if
+                    uiInstList.SelectedIndex = uiInstList.Items.Count == 0 ? -1 : 0;
+                    debugOut("-- stmt:" + currStmt.stmtLabel);
+                    runWorker.RunWorkerAsync(currInst);
+                } else {
+                    runFinished();
+                } // if
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
             dtend();
         } // function runNextStatement
         internal void runFinished() {
             dtbegin(funcName());
-            if (callStack.Count != 0) { // return to caller
-                var caller = callStack.Pop();
-                runContext.retVal = caller.Item3;
-                uiFuncList.Text = caller.Item1;
-                updateStmtUI(caller.Item1);
-                uiStmtList.Text = caller.Item2;
-                debugOut("Continuing at the caller: f@" + currFunc.funcName +", s@"+ currStmt.stmtLabel);
-                runNextStatement();
-                dtend();
-                return;
-            } // if
-            uiStatusLabel.Text = "Run Finished!";
-            uiProgRun.Enabled = true;
-            programState = PROGRAM_STATE.STOP;
-            uiFunctionRun.Enabled = !uiFunctionRun.Enabled;
-            uiProgRun.Enabled = !uiProgRun.Enabled;
-            // Cursor.Show();
-            // TODO: continue looping until there is a match on the screen.
-            updateUIStates();
+            try { 
+                if (callStack.Count != 0) { // return to caller
+                    var caller = callStack.Pop();
+                    runContext.vars["retVal"] = caller.Item3;
+                    uiFuncList.Text = caller.Item1;
+                    updateStmtUI(caller.Item1);
+                    uiStmtList.Text = caller.Item2;
+                    if (runContext.vars.ContainsKey("retVal")) {
+                        updateVariableTableRow($"retVal", runContext.vars["retVal"], false, "All,Debug");
+                    } // if
+                    debugOut("Continuing at the caller: f@" + currFunc.funcName +", s@"+ currStmt.stmtLabel);
+                    runNextStatement();
+                    dtend();
+                    return;
+                } // if
+                uiStatusLabel.Text = "Run Finished!";
+                uiProgRun.Enabled = true;
+                programState = PROGRAM_STATE.STOP;
+                uiFunctionRun.Enabled = !uiFunctionRun.Enabled;
+                uiProgRun.Enabled = !uiProgRun.Enabled;
+                // Cursor.Show();
+                // TODO: continue looping until there is a match on the screen.
+                updateUIStates();
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
             dtend();
         } // function runFinished
         #endregion
 
         #region Button actions
-        internal void uiProgDelClicked(object sender, EventArgs e)
-        {
+        internal void uiProgDelClicked(object sender, EventArgs e) {
             dtbegin(funcName());
             var index = uiProgList.SelectedIndex;
-            if (uiProgList.SelectedIndex != -1)
-            {
+            if (uiProgList.SelectedIndex != -1) {
                 string currName = uiProgList.SelectedItem.ToString();
                 folder.progList.RemoveAt(folder.progList.FindIndex(item => item.progName == currName));
                 uiProgList.Items.RemoveAt(uiProgList.SelectedIndex);
-                if (uiProgList.Items.Count > 0)
-                {
+                if (uiProgList.Items.Count > 0) {
                     uiProgList.SelectedIndex = 0;
-                }
-                else
-                {
+                } else {
                     uiProgList.Text = "";
                     uiFuncList.Text = "";
                 } // if
@@ -987,12 +1243,10 @@ namespace AIScreenAutomationApp
             updateUIStates();
             dtend();
         } // function uiProgDelClicked
-        internal void uiProgNewClicked(object sender, EventArgs e)
-        {
+        internal void uiProgNewClicked(object sender, EventArgs e) {
             dtbegin(funcName());
             int count = 1;
-            while (uiProgList.FindStringExact("New App " + count) != -1)
-            {
+            while (uiProgList.FindStringExact("New App " + count) != -1) {
                 count++;
             } // while
             var prog = new global::Script("New App " + count);
@@ -1000,8 +1254,7 @@ namespace AIScreenAutomationApp
             folder.progList.Add(prog);
             uiFuncList.Items.Clear();
             uiFuncList.Text = "";
-            foreach (Function func in prog.funcList)
-            {
+            foreach (Function func in prog.funcList) {
                 uiFuncList.Items.Add(func.funcName);
             } // foreach
             uiFuncList.SelectedIndex = uiFuncList.Items.Count - 1;
@@ -1009,21 +1262,18 @@ namespace AIScreenAutomationApp
             updateUIStates();
             dtend();
         } // function uiProgNewClicked
-        internal void uiProgStopClicked(object sender, EventArgs e)
-        {
+        internal void uiProgStopClicked(object sender, EventArgs e) {
             dtbegin(funcName());
             programState = PROGRAM_STATE.STOP;
             uiFunctionRun.Enabled = !uiFunctionRun.Enabled;
             uiProgRun.Enabled = !uiProgRun.Enabled;
             dtend();
         } // function uiProgStopClicked
-        internal void uiFuncNewClicked(object sender, EventArgs e)
-        {
+        internal void uiFuncNewClicked(object sender, EventArgs e) {
             dtbegin(funcName());
             if (currProg != null) { 
                 int count = 1;
-                while (uiFuncList.FindStringExact("New Function " + count) != -1)
-                {
+                while (uiFuncList.FindStringExact("New Function " + count) != -1) {
                     count++;
                 } // while
                 var func = new Function();
@@ -1145,12 +1395,20 @@ namespace AIScreenAutomationApp
             uiStmtList.SelectedIndex = uiStmtList.SelectedIndex + 1;
             dtend();
         } // function uiStmtDuplicateClicked
+        internal void uiInstListItemClicked(object sender, MouseEventArgs e) {
+            dtbegin(funcName());
+            int index = uiInstList.IndexFromPoint(e.Location);
+            if (uiInstList.SelectedIndex == index && e.Button == MouseButtons.Right) {
+                uiInstList.SelectedIndex = -1;
+            } // if
+            dtend();
+        } // function uiInstListItemClicked
         internal void uiInstMoveUpClicked(object sender, EventArgs e) {
             dtbegin(funcName());
             if (currInst.isCallInst()) {
                 dtend();
                 return; 
-            }
+            } // if
             if (currInst.isJumpInst()) {
                 if (prevInst != null && prevInst.isCallInst()) {
                     dtend();
@@ -1160,7 +1418,6 @@ namespace AIScreenAutomationApp
                 dtend();
                 return; 
             } // if
-
             if (uiInstList.SelectedIndex > 0) {
                 var index = uiInstList.SelectedIndex;
                 var temp2 = currStmt.instructions[index];
@@ -1205,8 +1462,7 @@ namespace AIScreenAutomationApp
             } // if
             dtend();
         } // function uiInstMoveDownClicked
-        internal void uiInstAddClicked(object sender, EventArgs e)
-        {
+        internal void uiInstAddClicked(object sender, EventArgs e) {
             dtbegin(funcName());
             Instruction inst = null;
             bool insertAtEnd = true;
@@ -1245,7 +1501,7 @@ namespace AIScreenAutomationApp
                     case "Cmp Box-copy": inst = new Instruction(InstructionType.SAT_CMPBOXCOPY, uiInstParams.Text, instCond); break;
                     case "Cmp Args": inst = new Instruction(InstructionType.SAT_CMPARGS, uiInstParams.Text, instCond, uiInstParamRight.Text); break;
                     case "Jump to Stmt": inst = new Instruction(InstructionType.SAT_JSTMT, uiInstParams.Text, instCond); break;
-                    case "Call Func": inst = new Instruction(InstructionType.SAT_CALLF, uiInstParams.Text, instCond); break;
+                    case "Call Func": inst = new Instruction(InstructionType.SAT_CALLF, uiInstParams.Text, instCond, uiInstParamRight.Text); break;
                     case "Key Press": inst = new Instruction(InstructionType.SAT_KEYPRESS, uiInstParams.Text, instCond); break;
                     case "Func Return": inst = new Instruction(InstructionType.SAT_FRETURN, uiInstParams.Text, instCond); break;
                     case "Stop Program": inst = new Instruction(InstructionType.SAT_STOP_PROGRAM, uiInstParams.Text, instCond); break;
@@ -1263,8 +1519,7 @@ namespace AIScreenAutomationApp
             updateUIStates();
             dtend();
         } // function uiInstAddClicked
-        internal void uiInstDelClicked(object sender, EventArgs e)
-        {
+        internal void uiInstDelClicked(object sender, EventArgs e) {
             dtbegin(funcName());
             if (uiInstList.SelectedIndex != -1) {
                 int index = uiInstList.SelectedIndex;
@@ -1282,14 +1537,12 @@ namespace AIScreenAutomationApp
         #endregion
 
         #region Other functions
-        internal void uiTestButton1_Click(object sender, EventArgs e)
-        {
+        internal void uiTestButton1_Click(object sender, EventArgs e) {
             dtbegin(funcName());
             uiTestTextBox.Text += "Button 1 Clicked\r\n";
             dtend();
         } // function uiTestButton1_Click
-        internal void uiTestButton2_Click(object sender, EventArgs e)
-        {
+        internal void uiTestButton2_Click(object sender, EventArgs e) {
             dtbegin(funcName());
             uiTestTextBox.Text += "Button 2 Clicked\r\n";
             dtend();
@@ -1313,8 +1566,7 @@ namespace AIScreenAutomationApp
                     foreach (var func in currProg.funcList)
                         foreach (var stmt in func.stmtList)
                             foreach (var inst in stmt.instructions)
-                                if (inst.isCallInst() && inst.instParamLeft == currFuncName)
-                                {
+                                if (inst.isCallInst() && inst.instParamLeft == currFuncName) {
                                     inst.instParamLeft = uiFuncList.Text;
                                 } // if
                     uiFuncList.Items[selectedFuncIndex] = uiFuncList.Text;
@@ -1331,12 +1583,9 @@ namespace AIScreenAutomationApp
                     if (IsStmtLabelUnique(uiStmtLabel.Text)) {
                         string currStmtLabel = uiStmtList.SelectedItem.ToString();
                         // update jump targets
-                        foreach (var stmt in currFunc.stmtList)
-                        {
-                            foreach (var inst in stmt.instructions)
-                            {
-                                if (inst.isJumpInst() && inst.instParamLeft == currStmtLabel)
-                                {
+                        foreach (var stmt in currFunc.stmtList) {
+                            foreach (var inst in stmt.instructions) {
+                                if (inst.isJumpInst() && inst.instParamLeft == currStmtLabel) {
                                     inst.instParamLeft = uiStmtLabel.Text;
                                 } // if
                             } // foreach
@@ -1439,10 +1688,8 @@ namespace AIScreenAutomationApp
         internal void uiInstListChanged(object sender, EventArgs e)
         {
             dtbegin(funcName());
-            if (!progRunning && callbackMapStatus[uiInstList])
-            {
-                if (uiInstList.SelectedIndex != -1)
-                {
+            if (!progRunning && callbackMapStatus[uiInstList]) {
+                if (uiInstList.SelectedIndex != -1) {
                     selectUpdateEnable(uiInstParams, false);
                     selectUpdateEnable(uiInstParamRight, false);
                     selectUpdateEnable(uiBBCondList, false);
@@ -1453,8 +1700,7 @@ namespace AIScreenAutomationApp
                     uiInstParamRight.Enabled = currInst.instName == "Cmp Args" || 
                         currInst.instName == "Call Func" ||
                         currInst.instName == "Assign";
-                    if (uiInstSelect.Text == "Mouse")
-                    {
+                    if (uiInstSelect.Text == "Mouse") {
                         uiInstParams.Text = currInst.instName;
                     } // if
                     selectUpdateEnable(uiInstParams, true);
@@ -1463,24 +1709,12 @@ namespace AIScreenAutomationApp
                     if (currInst.instructionType == InstructionType.SAT_CMPIMG ||
                         currInst.instructionType == InstructionType.SAT_CMPBOX ||
                         currInst.instructionType == InstructionType.SAT_CMPBOXCOPY)
-                    { // sync with imagelibrary view
-                        List<ImageVar> ivs = folder.imageLibrary.findImage(currInst.instParamLeft);
-                        tabControl1.SelectedTab = uiImageLibraryTab;
-                        foreach (ImageVar iv in ivs) {
-                            uiImageLibrary.Controls.SetChildIndex(iv.pb, 0);
-                        } // if
-                        if (ivs.Count != 0) {
-                            uiImageLibrary.ScrollControlIntoView(ivs[0].pb);
-                            uiILImageClicked(ivs[0].pb, null);
-                        } // if
-                    } // if
+                    syncImageListItem(currInst.instParamLeft);
                     selectUpdateEnable(uiInstSelect, false);
                     uiInstSelect.Text = currInst.selectName;
                     selectUpdateEnable(uiInstSelect, true);
                     uiInstList.Focus();
-                }
-                else
-                {
+                } else {
                     uiInstParams.SelectedIndexChanged -= uiInstParamSelectChanged;
                     uiBBCondList.SelectedIndexChanged -= uiBBCondChanged;
                     uiBBCondList.Text = "";
@@ -1488,7 +1722,7 @@ namespace AIScreenAutomationApp
                     uiBBCondList.SelectedIndexChanged += uiBBCondChanged;
                     uiInstParams.SelectedIndexChanged += uiInstParamSelectChanged;
                 } // if 
-            }
+            } // if
             dtend();
         } // function uiInstListChanged
         internal void uiInstParamListShow(object sender, EventArgs e) {
@@ -1518,19 +1752,35 @@ namespace AIScreenAutomationApp
                     uiInstParams.Items.Add("1000");
                     uiInstParams.Items.Add("2000");
                     uiInstParams.Items.Add("5000");
+                } else if (uiInstSelect.SelectedItem == "Print") {
+                    uiInstParams.Items.Add("{clipboard}");
+                    uiInstParams.Items.Add("{retVal}");
+                    uiInstParams.Items.Add("{ocrOut}");
+                    uiInstParams.Items.Add("{p0}");
+                    uiInstParams.Items.Add("{p1}");
                 } else if (uiInstSelect.SelectedItem == "Cmp Image") {
                     foreach (ImageVar iv in folder.imageLibrary.imageVars) {
-                        if (uiInstParams.FindStringExact(iv.imageName) == -1) {
-                            uiInstParams.Items.Add(iv.imageName);
+                        if (iv.pb.Visible) {
+                            List<string> names = iv.getImageNames;
+                            foreach (var ivName in names) {
+                                if (uiInstParams.FindStringExact(ivName) == -1) {
+                                    uiInstParams.Items.Add(ivName);
+                                } // if
+                            } // foreach
                         } // if
                     } // foreach
                 } else if (uiInstSelect.SelectedItem == "Cmp Box" || 
                     uiInstSelect.SelectedItem == "Cmp Box-copy") {
                     foreach (ImageVar iv in folder.imageLibrary.imageVars) {
                         if (iv.isOCRRectBox) {
-                            if (uiInstParams.FindStringExact(iv.imageName) == -1) {
-                                uiInstParams.Items.Add(iv.imageName);
-                            } // if
+                            List<string> names = iv.getImageNames;
+                            foreach (var ivName in names)
+                            {
+                                if (uiInstParams.FindStringExact(ivName) == -1)
+                                {
+                                    uiInstParams.Items.Add(ivName);
+                                } // if
+                            } // foreach
                         } // if
                     } // foreach
                 } else if (uiInstSelect.SelectedItem == "Call Func") {
@@ -1590,23 +1840,33 @@ namespace AIScreenAutomationApp
         } // function uiInstParamSelectChanged
         #endregion
 
+        #region Variables window functions
+        private void uiVariablesTableGroupListSelectChanged(object sender, EventArgs e)
+        {
+            uiVariableTableInit();
+        } // uiVariablesTableGroupListSelectChanged
+
+        #endregion
+
         #region Load/Save functions
         internal void uiSaveClicked(object sender, EventArgs e) {
             dtbegin(funcName());
             TextWriter file = null;
             uiStatusLabel.Text = "Saving to file...";
             int count = 1;
+            var baseFolder = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             try {
                 XmlSerializer xmlSerializer = new XmlSerializer(typeof(global::Folder));
-                while (File.Exists($"c:\\users\\onder\\MyMacroFile~{count}.xml")) count ++;
-                file = new StreamWriter($"c:\\users\\onder\\MyMacroFile~{count}.xml");
+                while (File.Exists($"{baseFolder}\\MyMacroFile~{count}.xml")) count ++;
+                file = new StreamWriter($"{baseFolder}\\MyMacroFile~{count}.xml");
                 xmlSerializer.Serialize(file, folder);
-                uiStatusLabel.Text = "Saving success..." + $"c:\\users\\onder\\MyMacroFile~{count}.xml";
+                uiStatusLabel.Text = "Saving success..." + $"{baseFolder}\\MyMacroFile~{count}.xml";
             } catch (Exception) {
                 uiStatusLabel.Text = "Saving file error...";
             } finally {
                 file?.Close();
-                File.Copy($"c:\\users\\onder\\MyMacroFile~{count}.xml", "c:\\users\\onder\\MyMacroFile.xml", true);
+                File.Copy($"{baseFolder}\\MyMacroFile~{count}.xml", $"{baseFolder}\\MyMacroFile.xml", true);
+                File.Copy($"{baseFolder}\\MyMacroFile~{count}.xml", $"{baseFolder}\\MyMacroFile.xml", true);
             } // finally
             dtend();
         } // function uiSaveClicked
@@ -1620,10 +1880,11 @@ namespace AIScreenAutomationApp
             uiProgList.Text = "";
             uiFuncList.Text = "";
             uiImageLibrary.Controls.Clear();
+            var baseFolder = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             FileStream fs = null;
             try {
                 XmlSerializer xmlSerializer = new XmlSerializer(typeof(global::Folder));
-                fs = new FileStream("c:\\users\\onder\\MyMacroFile.xml", FileMode.Open);
+                fs = new FileStream($"{baseFolder}\\MyMacroFile.xml", FileMode.Open);
                 folder = (global::Folder)xmlSerializer.Deserialize(fs);
             } catch {
                 uiStatusLabel.Text = "Loading file error...";
@@ -1652,38 +1913,39 @@ namespace AIScreenAutomationApp
                 if (currFunc != null) {
                     showStmts();
                 } // if
-                void mouseDown(object _sender, MouseEventArgs _e)
-                {
-                    if (uiILSetSearchRect.Checked)
-                    {
+                void mouseUp(object _sender, MouseEventArgs _e) {
+                    if (_e.Button == MouseButtons.Left && uiILSetOCRRect.Checked) {
+                        ImageVar iv = folder.imageLibrary.pb2ImageVar[(PictureBox)_sender];
+                        (iv.OCRRectBR.X, iv.OCRRectBR.Y) = (_e.X, _e.Y);
+                        if (iv.OCRRectTL.X > iv.OCRRectBR.X) (iv.OCRRectTL.X, iv.OCRRectBR.X) = (iv.OCRRectBR.X, iv.OCRRectTL.X);
+                        if (iv.OCRRectTL.Y > iv.OCRRectBR.Y) (iv.OCRRectTL.Y, iv.OCRRectBR.Y) = (iv.OCRRectBR.Y, iv.OCRRectTL.Y);
+                    } // if
+                } // mouseUp
+                void mouseDown(object _sender, MouseEventArgs _e) {
+                    if (uiILSetSearchRect.Checked) {
                         ImageVar iv = folder.imageLibrary.pb2ImageVar[(PictureBox)_sender];
                         (iv.searchRectTL.X, iv.searchRectTL.Y) = (_e.X, _e.Y);
                         (iv.searchRectBR.X, iv.searchRectBR.Y) = (_e.X, _e.Y);
                     } // if
-                    if (uiILSetOCRRect.Checked)
-                    {
+                    if (uiILSetOCRRect.Checked) {
                         ImageVar iv = folder.imageLibrary.pb2ImageVar[(PictureBox)_sender];
                         (iv.OCRRectTL.X, iv.OCRRectTL.Y) = (_e.X, _e.Y);
                         (iv.OCRRectBR.X, iv.OCRRectBR.Y) = (_e.X, _e.Y);
                     } // if
                 } // mouseDown
-                void mouseMove(object _sender, MouseEventArgs _e)
-                {
-                    if (_e.Button == MouseButtons.Left && uiILSetSearchRect.Checked)
-                    {
+                void mouseMove(object _sender, MouseEventArgs _e) {
+                    if (_e.Button == MouseButtons.Left && uiILSetSearchRect.Checked) {
                         ImageVar iv = folder.imageLibrary.pb2ImageVar[(PictureBox)_sender];
                         (iv.searchRectBR.X, iv.searchRectBR.Y) = (_e.X, _e.Y);
                         ((PictureBox)_sender).Invalidate();
                     } // if
-                    if (_e.Button == MouseButtons.Left && uiILSetOCRRect.Checked)
-                    {
+                    if (_e.Button == MouseButtons.Left && uiILSetOCRRect.Checked) {
                         ImageVar iv = folder.imageLibrary.pb2ImageVar[(PictureBox)_sender];
                         (iv.OCRRectBR.X, iv.OCRRectBR.Y) = (_e.X, _e.Y);
                         ((PictureBox)_sender).Invalidate();
                     } // if
-                }
-                void paintSearchRect(object _sender, PaintEventArgs pe)
-                {
+                } // mouseMove
+                void paintSearchRect(object _sender, PaintEventArgs pe) {
                     ImageVar iv = folder.imageLibrary.pb2ImageVar[(PictureBox)_sender];
                     {
                         int top = iv.searchRectTL.Y;
@@ -1705,10 +1967,12 @@ namespace AIScreenAutomationApp
                         pe.Graphics.DrawRectangle(new Pen(Brushes.BlueViolet), new Rectangle(left, top,
                             Math.Abs(left - right), Math.Abs(top - bottom)));
                     }
-                }
-
+                } // paintSearchRect
+                uiVariableTableInit();
                 foreach (ImageVar iv in folder.imageLibrary.imageVars) {
                     var pb = new PictureBox();
+                    pb.Padding = new Padding(PB_PADDING);
+                    pb.MouseUp += new MouseEventHandler(mouseUp);
                     pb.MouseDown += new MouseEventHandler(mouseDown);
                     pb.MouseMove += new MouseEventHandler(mouseMove);
                     pb.Paint += new PaintEventHandler(paintSearchRect);
@@ -1735,88 +1999,171 @@ namespace AIScreenAutomationApp
             } // catch
             dtend();
         } // function uiLoadClicked
+
+        private bool uiVariableTableHasName(string name) {
+            foreach(DataGridViewRow row in uiVariablesTable.Rows) {
+                if ((string)row.Cells["Name"].Value == name) return true;
+            } // foreach
+            return false;
+        } // uiVariableTableHasName
+        private void uiVariableTableInit() {
+            try { 
+                uiVariablesTable.Rows.Clear();
+                if (runContext.vars.ContainsKey("retVal")) { 
+                    updateVariableTableRow("retVal", runContext.vars["retVal"], false, "All,Debug");
+                } // if
+                updateVariableTableRow("clipboard", runContext.clipboard, false, "All,Debug");
+                updateVariableTableRow("ocrOut", "??", false, "All,Debug");
+                updateVariableTableRow("currCond", runContext.currCond.ToString(), false, "All,Debug");
+                foreach(var var in runContext.vars) {
+                    updateVariableTableRow(var.Key, var.Value, false, "All,Debug,Locals,Globals,Persistents");
+                } // foreach
+                foreach(var array in runContext.arrays) {
+                    updateVariableTableRow(array.Key, string.Join(",", array.Value), true, "All,Debug,Locals,Globals,Persistents");
+                } // foreach
+                foreach (ImageVar iv in folder.imageLibrary.imageVars) {
+                    foreach (string name in iv.imageName.Split(',')) {
+                        if (!uiVariableTableHasName(name)) {
+                            updateVariableTableRow(name, "<image>", false, "All,Images");
+                        } // if
+                    } // if
+                } // foreach
+                foreach (var im in runContext.imagesCaptured) {
+                    updateVariableTableRow(im.Key, "<image>", false, "All,Images,Debug");
+                } // foreach
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
+        } // uiVariableTableInit
         #endregion
 
         #region Image library related functions
         internal void uiILToggleOriginalSizeClicked(object sender, EventArgs e) {
             dtbegin(funcName());
-            foreach (var iv in folder.imageLibrary.imageVars) {
-                if (uiILToggleOriginalSize.Checked) {
-                    iv.pb.Width = iv.image.Width;
-                    iv.pb.Height = iv.image.Height;
-                } else {
-                    iv.pb.Width = Math.Min(150, iv.image.Width);
-                    iv.pb.Height = Math.Min(100, iv.image.Height);
-                } // if
-            } // foreach
-            dtend();
+            try {
+                foreach (var iv in folder.imageLibrary.imageVars) {
+                    if (uiILToggleOriginalSize.Checked) {
+                        iv.pb.Width = iv.image.Width;
+                        iv.pb.Height = iv.image.Height;
+                    } else {
+                        iv.pb.Width = Math.Min(150, iv.image.Width);
+                        iv.pb.Height = Math.Min(100, iv.image.Height);
+                    } // if
+                } // foreach
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try            dtend();
         } // function uiILToggleOriginalSizeClicked
         internal void uiILPasteClipboardImageClicked(object sender, EventArgs e) {
             dtbegin(funcName());
-            Image clipboardImage = Clipboard.GetImage();
-            if (clipboardImage != null) {
-                PictureBox pb = new PictureBox();
-                pb.BorderStyle = BorderStyle.None;
-                pb.Image = clipboardImage;
-                pb.Click += new System.EventHandler(this.uiILImageClicked);
-                uiImageLibrary.Controls.Add(pb);
-                ImageVar iv = new ImageVar(clipboardImage, folder.imageLibrary, pb);
-                folder.imageLibrary.imageVars.Add(iv);
-                folder.imageLibrary.pb2ImageVar[pb] = iv;
-            } // if
+            try { 
+                Image clipboardImage = Clipboard.GetImage();
+                if (clipboardImage != null) {
+                    PictureBox pb = new PictureBox();
+                    pb.Padding = new Padding(PB_PADDING);
+                    pb.BorderStyle = BorderStyle.None;
+                    pb.Image = clipboardImage;
+                    pb.Click += new System.EventHandler(this.uiILImageClicked);
+                    uiImageLibrary.Controls.Add(pb);
+                    ImageVar iv = new ImageVar(clipboardImage, folder.imageLibrary, pb);
+                    folder.imageLibrary.imageVars.Add(iv);
+                    folder.imageLibrary.pb2ImageVar[pb] = iv;
+                } // if
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
             dtend();
         } // function uiILPasteClipboardImageClicked
         internal void uiILImageDelClicked(object sender, EventArgs e) {
             dtbegin(funcName());
-            PictureBox pb = selectedImageVarPB;
-            if (pb != null) {
-                ImageVar iv = folder.imageLibrary.pb2ImageVar[pb];
-                folder.imageLibrary.pb2ImageVar.Remove(pb);
-                uiImageLibrary.Controls.Remove(pb);
-                folder.imageLibrary.imageVars.Remove(iv);
-            } // if
+            try {
+                PictureBox pb = selectedImageVarPB;
+                if (pb != null) {
+                    ImageVar iv = folder.imageLibrary.pb2ImageVar[pb];
+                    folder.imageLibrary.pb2ImageVar.Remove(pb);
+                    uiImageLibrary.Controls.Remove(pb);
+                    folder.imageLibrary.imageVars.Remove(iv);
+                } // if
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
             dtend();
         } // function uiILImageDelClicked
         internal void uiILImageClicked(object sender, EventArgs e) {
             dtbegin(funcName());
-            PictureBox libImage = (PictureBox)sender;
-            foreach (PictureBox pb in uiImageLibrary.Controls) {
-                pb.BorderStyle = BorderStyle.None;
-            } // foreach
-            libImage.BorderStyle = BorderStyle.Fixed3D;
-            ImageVar iv = folder.imageLibrary.pb2ImageVar[libImage];
-            uiILImageName.Text = iv.imageName;
-            iv.matchThreshold = iv.matchThreshold.Replace(',', '.');
-            uiILOCRParams.Text = $"{iv.matchThreshold},{iv.OCRParams}";
-            uiILOCRBoxButton.Checked = iv.isOCRRectBox;
-            MouseEventArgs me = (MouseEventArgs)e;
-            if (uiILSetHotSpot.Checked && me != null && me.Button == MouseButtons.Left)
-            { // mark the hotspot
-                iv.actionOffset = me.Location.X + "," + me.Location.Y;
-                iv.drawHotSpotOnPB();
-            } // if
+            try {
+                MouseEventArgs me = (MouseEventArgs)e;
+                PictureBox libImagePB = (PictureBox)sender;
+                foreach (PictureBox pb in uiImageLibrary.Controls) {
+                    pb.BorderStyle = BorderStyle.None;
+                } // foreach
+                libImagePB.BorderStyle = BorderStyle.FixedSingle;
+                ImageVar iv = folder.imageLibrary.pb2ImageVar[libImagePB];
+                uiILImageName.Text = iv.imageName;
+                if (me?.Button == MouseButtons.Right) { 
+                    Clipboard.SetImage(iv.image);
+                } // if
+                iv.matchThreshold = iv.matchThreshold.Replace(',', '.');
+                uiILOCRParams.Text = $"{iv.matchThreshold},{iv.OCRParams}";
+                if (iv.searchRectBR != iv.searchRectTL) {
+                    uiILSetSearchRect.Text = "[🔍]";
+                } else {
+                    uiILSetSearchRect.Text = "🔍";
+                } // if
+                if (iv.OCRRectBR != iv.OCRRectTL) {
+                    uiILSetOCRRect.Text = "[🗚]";
+                } else {
+                    uiILSetOCRRect.Text = "🗚";
+                } // if
+                if (iv.isOCRRectBox) {
+                    uiILOCRBoxButton.Text = "[❏]";
+                } else {
+                    uiILOCRBoxButton.Text = "❏";
+                } // if
+                libImagePB.Width = iv.image.Width;
+                libImagePB.Height = iv.image.Height;
+                if (iv.actionOffset.Contains(",")) {
+                    uiILSetHotSpot.Text = "[🎯]";
+                } else { 
+                    uiILSetHotSpot.Text = "🎯";
+                } // if
+                if (uiILSetHotSpot.Checked && me != null && me.Button == MouseButtons.Left)
+                { // mark the hotspot
+                    iv.actionOffset = me.Location.X + "," + me.Location.Y;
+                    uiILSetHotSpot.Text = "[🎯]";
+                    iv.drawHotSpotOnPB();
+                } // if
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
             dtend();
         } // function uiILImageClicked
         internal void uiILReplaceImageClicked(object sender, EventArgs e) {
             dtbegin(funcName());
-            Image clipboardImage = Clipboard.GetImage();
-            if (clipboardImage != null) {
-                PictureBox pb = selectedImageVarPB;
-                pb.Image = clipboardImage;
-                var iv = folder.imageLibrary.pb2ImageVar[pb];
-                iv.image = pb.Image;
-                iv.searchRectBR = iv.searchRectTL;
-                iv.actionOffset = "";
-            } // if
+            try {
+                Image clipboardImage = Clipboard.GetImage();
+                if (clipboardImage != null) {
+                    PictureBox pb = selectedImageVarPB;
+                    pb.Image = clipboardImage;
+                    var iv = folder.imageLibrary.pb2ImageVar[pb];
+                    iv.image = pb.Image;
+                    iv.searchRectBR = iv.searchRectTL;
+                    iv.actionOffset = "";
+                } // if
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
             dtend();
         } // function uiILReplaceImageClicked
-        private void uiILImageNameChanged(object sender, KeyPressEventArgs e)
-        {
+        private void uiILImageNameChanged(object sender, KeyPressEventArgs e) {
             dtbegin(funcName());
-            if (selectedImageVarPB != null)
-            {
-                folder.imageLibrary.pb2ImageVar[selectedImageVarPB].imageName = uiILImageName.Text;
-            } // if
+            try {
+                if (selectedImageVarPB != null) {
+                    folder.imageLibrary.pb2ImageVar[selectedImageVarPB].imageName = uiILImageName.Text;
+                } // if
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
             dtend();
         } // function uiILImageNameChanged
         private void uiILShowOCROutClicked(object sender, EventArgs e) {
@@ -1833,12 +2180,10 @@ namespace AIScreenAutomationApp
                 return;
             } // if
             selectedImageVarPB.Image = folder.imageLibrary.pb2ImageVar[selectedImageVarPB].image;
-            try
-            {
+            try {
                 var iv = folder.imageLibrary.pb2ImageVar[selectedImageVarPB];
                 Bitmap searchBitmap = new Bitmap(iv.image);
-                if (iv.searchRectBR != iv.searchRectTL)
-                {
+                if (iv.searchRectBR != iv.searchRectTL) {
                     int top = iv.searchRectTL.Y;
                     int left = iv.searchRectTL.X;
                     int bottom = iv.searchRectBR.Y;
@@ -1851,18 +2196,14 @@ namespace AIScreenAutomationApp
                 Image<Bgr, Byte> searchImg = searchBitmap.ToImage<Bgr, byte>();
                 var ocrImage = searchImg.Clone().Resize(float.Parse(parameters[0]), Inter.Cubic);
                 var ocrImageGray = ocrImage.Convert<Gray, byte>();
-                if (float.Parse(parameters[1]) != -1 && float.Parse(parameters[2]) != -1)
-                {
+                if (float.Parse(parameters[1]) != -1 && float.Parse(parameters[2]) != -1) {
                     ocrImageGray = ocrImageGray.SmoothBilateral(int.Parse(parameters[1]), int.Parse(parameters[2]), int.Parse(parameters[2]));
                 } // if
                 if (int.Parse(parameters[4]) != -1) { 
-                    if (int.Parse(parameters[3]) == 1)
-                    {
+                    if (int.Parse(parameters[3]) == 1) {
                         ocrImageGray = ocrImageGray.ThresholdBinaryInv(new Gray(int.Parse(parameters[4])),
                         new Gray(255));
-                    }
-                    else
-                    {
+                    } else {
                         ocrImageGray = ocrImageGray.ThresholdBinary(new Gray(int.Parse(parameters[4])),
                         new Gray(255));
                     } // if
@@ -1875,11 +2216,9 @@ namespace AIScreenAutomationApp
                 debugOut(page.GetText());
                 page.Dispose();
                 pix.Dispose();
-            } // try
-            catch (Exception e1)
-            {
-                uiStatusLabel.Text = "Error in processing: " + e1.ToString();
-                debugOut(e1.ToString());
+            } catch (Exception ex) {
+                uiStatusLabel.Text = "Error in processing: " + ex.ToString();
+                debugOut(ex.ToString());
             } // catch
             dtend();
         } // function uiILShowOCROutClicked
@@ -1888,69 +2227,75 @@ namespace AIScreenAutomationApp
         #region Key press events
         internal void uiProgListKeyPress(object sender, KeyPressEventArgs e) {
             dtbegin(funcName());
-            if (e.KeyChar == (int)Keys.Enter) {
-                uiProgListNameChanged(null, null);
-            } // if
+            try { 
+                if (e.KeyChar == (int)Keys.Enter) {
+                    uiProgListNameChanged(null, null);
+                } // if
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
             dtend();
         } // function uiProgListKeyPress
         internal void uiFuncListKeyPress(object sender, KeyPressEventArgs e) {
             dtbegin(funcName());
-            if (e.KeyChar == (int)Keys.Enter) {
-                uiFuncListNameChanged(null, null);
-            } // if
+            try { 
+                if (e.KeyChar == (int)Keys.Enter) {
+                    uiFuncListNameChanged(null, null);
+                } // if
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
             dtend();
         } // function uiFuncListKeyPress
         internal void uiStmtLabelKeyPress(object sender, KeyPressEventArgs e) {
             dtbegin(funcName());
-            if (e.KeyChar == (int)Keys.Enter) {
-                uiStmtNameUpdateClicked(null, null);
-                uiStmtList.Focus();
-            } // if
+            try { 
+                if (e.KeyChar == (int)Keys.Enter) {
+                    uiStmtNameUpdateClicked(null, null);
+                    uiStmtList.Focus();
+                } // if
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
             dtend();
         } // function uiStmtLabelKeyPress
         internal void uiInstParamsKeyPress(object sender, KeyPressEventArgs e) {
             dtbegin(funcName());
-            if (e.KeyChar == (int)Keys.Enter) {
-                if (uiInstList.SelectedIndex != -1) { 
-                    currInst.instParamLeft = uiInstParams.Text;
-                    currInst.instParamRight = uiInstParamRight.Text;
-                    updateStmtUI(currStmt.stmtLabel, uiInstList.SelectedIndex);
-                    uiInstList.Focus();
+            try {
+                if (e.KeyChar == (int)Keys.Enter) {
+                    if (uiInstList.SelectedIndex != -1) { 
+                        currInst.instParamLeft = uiInstParams.Text;
+                        currInst.instParamRight = uiInstParamRight.Text;
+                        updateStmtUI(currStmt.stmtLabel, uiInstList.SelectedIndex);
+                        uiInstList.Focus();
+                    } // if
                 } // if
-            } // if
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
             dtend();
         } // function uiInstParamsKeyPress
         #endregion
+        private void uiInstParamRight_SelectedIndexChanged(object sender, EventArgs e){
 
-        private void uiInstListItemClicked(object sender, MouseEventArgs e) {
+        } // uiInstParamRight_SelectedIndexChanged
+
+        private void uiILCheckMatchResult(object sender, EventArgs e) {
             dtbegin(funcName());
-            int index = uiInstList.IndexFromPoint(e.Location);
-            if (uiInstList.SelectedIndex == index && e.Button == MouseButtons.Right) {
-                uiInstList.SelectedIndex = -1;
-            } // if
-            dtend();
-        } // function uiInstListItemClicked
-
-        private void uiInstParamRight_SelectedIndexChanged(object sender, EventArgs e)
-        {
-
-        }
-
-        private void uiILCheckMatchResult(object sender, EventArgs e)
-        {
-            dtbegin(funcName());
-            if (selectedImageVarPB != null)
-            {
-                selectedImageVarPB.Image = folder.imageLibrary.pb2ImageVar[selectedImageVarPB].image;
-                uiImageLibrary.Visible = false;
-                ImageVar iv = folder.imageLibrary.pb2ImageVar[selectedImageVarPB];
-                processCmpImage(folder.imageLibrary.pb2ImageVar[selectedImageVarPB].imageName, iv.isOCRRectBox, iv);
-                uiImageLibrary.Visible = true;
-                uiILOCRParams.Text = $"{runContext.maxValue}";
-            }
-            else { 
-                uiStatusLabel.Text = "Please select an image in the library.";
-            } // if
+            try {
+                if (selectedImageVarPB != null) {
+                    selectedImageVarPB.Image = folder.imageLibrary.pb2ImageVar[selectedImageVarPB].image;
+                    uiImageLibrary.Visible = false;
+                    ImageVar iv = folder.imageLibrary.pb2ImageVar[selectedImageVarPB];
+                    processCmpImage(null, iv.isOCRRectBox, iv);
+                    uiImageLibrary.Visible = true;
+                    uiILOCRParams.Text = $"{runContext.maxValue}";
+                } else { 
+                    uiStatusLabel.Text = "Please select an image in the library.";
+                } // if
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
             dtend();
         } // uiILCheckMatchResult
 
@@ -1972,45 +2317,231 @@ namespace AIScreenAutomationApp
 
         private void uiILSetThresholdClicked(object sender, EventArgs e) {
             dtbegin(funcName());
-            if (selectedImageVarPB == null) {
-                uiStatusLabel.Text = "Please select an image in the library.";
-                dtend();
-                return;
-            } // if
-            string matchTreshold = uiILOCRParams.Text.Split(',')[0];
-            string ocrParams = Regex.Replace(uiILOCRParams.Text, "^.*?,", "");
-            folder.imageLibrary.pb2ImageVar[selectedImageVarPB].matchThreshold = matchTreshold;
-            folder.imageLibrary.pb2ImageVar[selectedImageVarPB].OCRParams = ocrParams;
+            try {
+                if (selectedImageVarPB == null) {
+                    uiStatusLabel.Text = "Please select an image in the library.";
+                    dtend();
+                    return;
+                } // if
+                string matchTreshold = uiILOCRParams.Text.Split(',')[0];
+                string ocrParams = Regex.Replace(uiILOCRParams.Text, "^.*?,", "");
+                folder.imageLibrary.pb2ImageVar[selectedImageVarPB].matchThreshold = matchTreshold;
+                folder.imageLibrary.pb2ImageVar[selectedImageVarPB].OCRParams = ocrParams;
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
             dtend();
         } // uiILSetThresholdClicked
-
         private void uiILOCRBoxButtonClicked(object sender, EventArgs e) {
             dtbegin(funcName());
-            if (selectedImageVarPB == null) {
-                uiStatusLabel.Text = "Please select an image in the library.";
-            } else { 
-                folder.imageLibrary.pb2ImageVar[selectedImageVarPB].isOCRRectBox = uiILOCRBoxButton.Checked;
-            } // if
+            try { 
+                if (selectedImageVarPB == null) {
+                    uiStatusLabel.Text = "Please select an image in the library.";
+                } else {
+                    folder.imageLibrary.pb2ImageVar[selectedImageVarPB].isOCRRectBox = !folder.imageLibrary.pb2ImageVar[selectedImageVarPB].isOCRRectBox;
+                    if (folder.imageLibrary.pb2ImageVar[selectedImageVarPB].isOCRRectBox) {
+                        uiILOCRBoxButton.Text = "[❏]";
+                    } else {
+                        uiILOCRBoxButton.Text = "❏";
+                    } // if
+                } // if
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
             dtend();
         } // uiILOCRBoxButtonClicked
-
-        private void uiInstCommentToggleClicked(object sender, EventArgs e)
-        {
-            currInst.isCommentedOut = !currInst.isCommentedOut;
-            int instIndex = uiInstList.SelectedIndex + 1;
-            if (instIndex == uiInstList.Items.Count) instIndex--;
-            updateStmtUI(currStmt.stmtLabel, instIndex);
+        private void uiInstCommentToggleClicked(object sender, EventArgs e) {
+            try {
+                currInst.isCommentedOut = !currInst.isCommentedOut;
+                int instIndex = uiInstList.SelectedIndex + 1;
+                if (instIndex == uiInstList.Items.Count) instIndex--;
+                updateStmtUI(currStmt.stmtLabel, instIndex);
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
         } // uiInstCommentToggleClicked
+        private void uiStmtCommentToggleClicked(object sender, EventArgs e) {
+            try {
+                var idx = uiStmtList.SelectedIndex+1;
+                currStmt.isCommentedOut = !currStmt.isCommentedOut;
+                uiFuncListChanged(null, null);
+                if (idx == uiStmtList.Items.Count) idx--;
+                uiStmtList.SelectedIndex = idx;
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
+        } // uiStmtCommentToggleClicked
+        private void uiVariablesTableDelButtonClicked(object sender, EventArgs e) {
+            try {
+                uiVariableTableInit();
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
+        } // uiVariablesTableDelButtonClicked
+        private void uiInstStepNextButtonClicked(object sender, EventArgs e) {
+            dtbegin(funcName());
+            try {
+                if (!runWorker.IsBusy) { 
+                    if (programState == PROGRAM_STATE.STEPINST) {
+                        runWorker.RunWorkerAsync(currInst);
+                    } else {
+                        programState = PROGRAM_STATE.STEPINST;
+                        callStack = new Stack<Tuple<FuncName, StmtLabel, RetVal, List<string>>>();
+                        argStack = new Stack<VarName>();
+                        if (uiStmtList.Items.Count != 0) {
+                            uiStmtList.SelectedIndex = 0;
+                            uiInstList.SelectedIndex = uiInstList.Items.Count == 0 ? -1 : 0;
+                            uiStatusLabel.Text = "Program running...";
+                            debugOut("Run stmt: " + currStmt.text);
+                            runWorker.RunWorkerAsync(currInst);
+                        } // if
+                    } // if
+                } // if
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
+            dtend();
+        } // uiInstStepNextButtonClicked
 
-        private void uiStmtCommentToggleClicked(object sender, EventArgs e)
-        {
-            currStmt.isCommentedOut = !currStmt.isCommentedOut;
-            uiFuncListChanged(null, null);
-        }
+        private void uiVariablesTable_RowHeaderMouseClick(object sender, DataGridViewCellMouseEventArgs e) {
+            try {
+                foreach (DataGridViewRow row in uiVariablesTable.SelectedRows) {
+                    if ((string)row.Cells["Value"].Value == "<image>") {
+                        var imageName = (string)row.Cells["Name"].Value;
+                        if (uiBoxCalibrateTab.TabPages[uiBoxCalibrateTab.SelectedIndex].Text != "Box Calibrate") {
+                            syncImageListItem(imageName);
+                        } // if
+                        if (runContext.imagesCaptured.ContainsKey(imageName)) {
+                            uiBoxCalibrateCaptureImgNonZoom = (Image)runContext.imagesCaptured[imageName].Clone();
+                            uiBoxCalibrateCaptureImg.Image = uiBoxCalibrateCaptureImgNonZoom;
+                            uiBoxCalibrateCaptureImg.Width = uiBoxCalibrateCaptureImgNonZoom.Width;
+                            uiBoxCalibrateCaptureImg.Height = uiBoxCalibrateCaptureImgNonZoom.Height;
+                            panMovingPoint = Point.Empty;
+                            panStartingPoint = Point.Empty;
+                            panning = false;
+                        } // if
+                    } // if
+                } // foreach
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
+        } // uiVariablesTable_RowHeaderMouseClick
+        void syncImageListItem(string imageNames) {
+            try {
+                uiBoxCalibrateTab.SelectedTab = uiImageLibraryTab;
+                foreach (var imageName in imageNames.Split(',')) {
+                    List<ImageVar> ivs = folder.imageLibrary.findImage(imageName);
+                    foreach (ImageVar iv in ivs) {
+                        uiImageLibrary.Controls.SetChildIndex(iv.pb, 0);
+                    } // foreach
+                    if (ivs.Count != 0) {
+                        uiImageLibrary.ScrollControlIntoView(ivs[0].pb);
+                        uiILImageClicked(ivs[0].pb, null);
+                    } // if
+                } // foreach
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
+        } // syncImageListItem
+
+        private void uiBoxCalibrateImgSelect_SelectedIndexChanged(object sender, EventArgs e) {
+            try {
+                var ivs = folder.imageLibrary.findImage(uiBoxCalibrateImgSelect.Text);
+                uiBoxCalibrateMatchImg.Image = ivs[0].image;
+                uiBoxCalibrateMatchImg.Width = ivs[0].image.Width;
+                uiBoxCalibrateMatchImg.Height = ivs[0].image.Height;
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
+        } // uiBoxCalibrateImgSelect_SelectedIndexChanged
+
+        private void uiBoxCalibrateImgSelect_DropDown(object sender, EventArgs e) {
+            try {
+                uiBoxCalibrateImgSelect.Items.Clear();
+                foreach (ImageVar iv in folder.imageLibrary.imageVars) {
+                    if (iv.isOCRRectBox) {
+                        List<string> names = iv.getImageNames;
+                        foreach (var ivName in names) {
+                            if (uiBoxCalibrateImgSelect.FindStringExact(ivName) == -1) {
+                                uiBoxCalibrateImgSelect.Items.Add(ivName);
+                            } // if
+                        } // foreach
+                    } // if
+                } // foreach
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
+        } // uiBoxCalibrateImgSelect_DropDown
+
+        private void uiBoxCalibratePasteCaptureImg_Click(object sender, EventArgs e) {
+            try {
+                Image clipboardImage = Clipboard.GetImage();
+                if (clipboardImage != null) {
+                    runContext.imagesCaptured["debug-clipboard"] = clipboardImage;
+
+                    uiBoxCalibrateCaptureImgNonZoom = (Image)clipboardImage.Clone();
+                    uiBoxCalibrateCaptureImg.Image = uiBoxCalibrateCaptureImgNonZoom;
+                    uiBoxCalibrateCaptureImg.Width = uiBoxCalibrateCaptureImgNonZoom.Width;
+                    uiBoxCalibrateCaptureImg.Height = uiBoxCalibrateCaptureImgNonZoom.Height;
+                    panMovingPoint = Point.Empty;
+                    panStartingPoint = Point.Empty;
+                    panning = false;
+                } // if
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
+        } // uiBoxCalibratePasteCaptureImg_Click
+        private void uiBoxCalibrateMatchButton_Click(object sender, EventArgs e) {
+            try {
+                var ivs = folder.imageLibrary.findImage(uiBoxCalibrateImgSelect.Text);
+                if (ivs.Count != 0) {
+                    uiBoxCalibrateTab.Visible = false;
+                    processCmpImage(null, false, ivs[0]);
+                    uiBoxCalibrateTab.Visible = true;
+                } // if
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
+        } // uiBoxCalibrateMatchButton_Click
+
+        private void uiBoxCalibrateExportButton_Click(object sender, EventArgs e) {
+            try {
+                string imageExportTxt = "";
+                var bitmap = new Bitmap(uiBoxCalibrateCaptureImg.Image);
+                for (var r = 0; r < bitmap.Height; r++) { 
+                    for (var c = 0; c < bitmap.Width; c ++) {
+                        var pixData = bitmap.GetPixel(c, r);
+                        imageExportTxt += pixData.ToString() + "\t";
+                    } // for
+                    imageExportTxt += "\n\r";
+                } // for
+                Clipboard.SetText(imageExportTxt);
+                uiStatusLabel.Text = "Image data export to clipboard is finished. " + DateTime.Now;
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
+        } // uiBoxCalibrateExportButton_Click
+
+        private void uiILFilterName_TextChanged(object sender, KeyPressEventArgs e) {
+            try {
+                var text = uiILImageName.Text;
+                uiILImageName.Text = "Please wait...";
+                uiILImageName.Enabled = false;
+                if (e.KeyChar == (int)Keys.Enter) {
+                    foreach (var img in folder.imageLibrary.imageVars) {
+                        img.pb.Visible = img.imageName.Contains(uiILFilterName.Text);
+                    } // foreach
+                } // if
+                uiILImageName.Text = text;
+                uiILImageName.Enabled = true;
+            } catch (Exception ex) {
+                uiStatusLabel.Text = $"Internal error: {ex.Message}{checkBreak}";
+            } // try
+        } // uiILFilterName_TextChanged
     } // class Form1
 } // namespace AIScreenAutomationApp
 
-enum PROGRAM_STATE { STOP, RUNNING, PAUSE } // enum PROGRAM_STATE 
+enum PROGRAM_STATE { STOP, RUNNING, PAUSE, STEPINST, RUNINST } // enum PROGRAM_STATE 
 
 public enum InstructionType {SAT_DELAY, SAT_KEYPRESS, SAT_LCLICK,
     SAT_LDOWN, SAT_LUP, SAT_RCLICK, SAT_DCLICK, SAT_MMOVE, SAT_PRINTLN,
@@ -2025,12 +2556,9 @@ public class Instruction : ICloneable {
     public bool isCommentedOut;
     public Point screenLoc; // recognition location when inst is cmpimg
     public InstructionType instructionType;
-    public string text
-    {
-        get
-        {
-            if (isCommentedOut)
-            {
+    public string text {
+        get {
+            if (isCommentedOut) {
                 return "// " + instCondition + " @ " + instName + paramText;
             } // if
             return instCondition + " @ " + instName + paramText;
@@ -2083,12 +2611,10 @@ public class Instruction : ICloneable {
                 case InstructionType.SAT_PRINTLN: return "Print";
             } // switch
             return "Invalid";
-        }
-    }
-    public string instName
-    {
-        get
-        {
+        } // get
+    } // selectName
+    public string instName {
+        get {
             switch (instructionType) {
                 case InstructionType.SAT_CMPARGS: return "Cmp Args";
                 case InstructionType.SAT_CMPIMG: return "Cmp Image";
@@ -2112,19 +2638,15 @@ public class Instruction : ICloneable {
             return "Invalid";
         } // get
     } // string instName
-    public string paramText
-    {
-        get
-        {
-            switch (instructionType)
-            {
+    public string paramText {
+        get {
+            switch (instructionType) {
                 case InstructionType.SAT_KEYPRESS:
                 case InstructionType.SAT_DELAY:
                 case InstructionType.SAT_CMPIMG:
                 case InstructionType.SAT_CMPBOX:
                 case InstructionType.SAT_CMPBOXCOPY:
                 case InstructionType.SAT_PUSHARG:
-                case InstructionType.SAT_CALLF:
                 case InstructionType.SAT_FRETURN:
                 case InstructionType.SAT_JSTMT:
                 case InstructionType.SAT_PRINTLN:
@@ -2133,6 +2655,8 @@ public class Instruction : ICloneable {
                     return $"({instParamLeft}, {instParamRight})";
                 case InstructionType.SAT_ASSIGN:
                     return $"({instParamLeft}={instParamRight})";
+                case InstructionType.SAT_CALLF:
+                    return $" {instParamLeft}({instParamRight})";
             } // switch
             return "";
         } // get
@@ -2151,13 +2675,29 @@ public class Instruction : ICloneable {
     public const int MOUSEEVENTF_RIGHTUP = 0x10;
     public const int MOUSEEVENTF_ABSOLUTE = 0x8000;
 
+    public bool isBuiltIn(string funcName) {
+        switch(funcName) {
+            case "split":
+            case "replace":
+            case "min":
+            case "max":
+                return true;
+        } // switch
+        return false;
+    } // isBuiltIn
     public bool isCallInst()
     {
-        return instructionType == InstructionType.SAT_CALLF;
+        if (instructionType == InstructionType.SAT_CALLF) return !isBuiltIn(instParamLeft);
+        return false;
     } // function isCallInst
+    public bool isCmpImgInst{
+        get {
+            return instructionType == InstructionType.SAT_CMPIMG || instructionType == InstructionType.SAT_CMPBOX || instructionType == InstructionType.SAT_CMPBOXCOPY;
+        } // get
+    } // isCmpImgInst
     public bool isCallOrJumpInst()
     {
-        return instructionType == InstructionType.SAT_CALLF || instructionType == InstructionType.SAT_JSTMT;
+        return isCallInst() || instructionType == InstructionType.SAT_JSTMT;
     } // function isCallInst
     public bool isJumpInst()
     {
@@ -2172,8 +2712,7 @@ public class Instruction : ICloneable {
     public bool ExecInstContinue(Statement statement) {
         form.debugOut("ExecInstContinue: " + text);
         uint isAbsolute = 0;
-        Point getHotSpot()
-        {
+        Point getHotSpot() {
             Point _pt = new Point(0, 0);
             isAbsolute = MOUSEEVENTF_ABSOLUTE;
             _pt = new Point((Size)form.runContext.screenMatchLoc);
@@ -2212,25 +2751,27 @@ public class Instruction : ICloneable {
                 Thread.Sleep(300);
                 SendKeys.Send("^c");
                 Thread.Sleep(300);
-                if (Clipboard.ContainsText()) { 
-                    form.runContext.clipboard = Clipboard.GetText(TextDataFormat.Text);
-                } // if
-                if (form.uiInstList.SelectedIndex != form.uiInstList.Items.Count - 1)
-                {
+                try {
+                    if (Clipboard.ContainsText()) {
+                        form.runContext.clipboard = Clipboard.GetText(TextDataFormat.Text);
+                        form.updateVariableTableRow("clipboard", form.runContext.clipboard, false, "All,Debug");
+                    } // if
+                } catch (Exception e) {
+                    form.debugOut($"Clipboard access error: {e.Message}");
+                } // try
+                if (form.uiInstList.SelectedIndex != form.uiInstList.Items.Count - 1) {
                     form.uiInstList.SelectedIndex++;
                 } // if
                 return false;            
             case InstructionType.SAT_CMPBOX:
                 form.runWorker.RunWorkerAsync(form.currInst);
-                if (form.uiInstList.SelectedIndex != form.uiInstList.Items.Count - 1)
-                {
+                if (form.uiInstList.SelectedIndex != form.uiInstList.Items.Count - 1) {
                     form.uiInstList.SelectedIndex++;
                 } // if
                 return false;
             case InstructionType.SAT_CMPIMG:
                 form.runWorker.RunWorkerAsync(form.currInst);
-                if (form.uiInstList.SelectedIndex != form.uiInstList.Items.Count - 1)
-                {
+                if (form.uiInstList.SelectedIndex != form.uiInstList.Items.Count - 1) {
                     form.uiInstList.SelectedIndex++;
                 } // if
                 return false;
@@ -2337,17 +2878,25 @@ public class Instruction : ICloneable {
                     form.runNextStatement();
                     return false;
                 } // if
-                int jumpToStmtIndex = form.currFunc.stmtList.FindIndex(step => step.stmtLabel == instParamLeft);
+                string jmpToStmt = form.substituteVars(instParamLeft);
+                int jumpToStmtIndex = form.currFunc.stmtList.FindIndex(step => step.stmtLabel == jmpToStmt);
                 if (jumpToStmtIndex != -1) {
-                    form.debugOut("-- Jump to stmt:" + instParamLeft);
+                    form.debugOut("-- Jump to stmt:" + jmpToStmt);
                     form.uiStmtList.SelectedIndex = jumpToStmtIndex;
                     form.uiInstList.SelectedIndex = form.uiInstList.Items.Count == 0 ? -1 : 0;
                     form.debugOut("-- stmt:" + form.currStmt.stmtLabel);
+                    if (form.currStmt.isCommentedOut) {
+                        form.debugOut($"Error: jumping to commented out statement.{form.currStmt.stmtLabel}");
+                        form.debugOut("Stopping program");
+                        form.programState = PROGRAM_STATE.STOP;
+                        form.uiFunctionRun.Enabled = !form.uiFunctionRun.Enabled;
+                        form.uiProgRun.Enabled = !form.uiProgRun.Enabled;
+                        break;
+                    } // if
                     form.runWorker.RunWorkerAsync(form.currInst);
                     return false;
                 } else {
-                    form.debugOut("Internal Error: statement not found: " +
-                            instParamLeft + " @statement=" +
+                    form.debugOut($"Internal Error: statement not found: {instParamLeft}/{jmpToStmt} @statement=" +
                             form.currStmt.stmtLabel);
                     form.debugOut("Stopping program");
                     form.programState = PROGRAM_STATE.STOP;
@@ -2362,7 +2911,14 @@ public class Instruction : ICloneable {
                         ", s@" + form.currStmt.stmtLabel);
                     List<string> parameters = new List<string>();
                     parameters.InsertRange(0, instParamRight.Split(','));
-                    form.callStack.Push(new Tuple<FuncName, StmtLabel, RetVal, List<string>>(form.currFunc.funcName, form.currStmt.stmtLabel, form.runContext.retVal, parameters));
+                    for (int c = 0;c < parameters.Count;c ++) {
+                        parameters[c] = form.substituteVars(parameters[c]);
+                    } // for
+                    if (!form.runContext.vars.ContainsKey("retVal")) {
+                        form.runContext.vars["retVal"] = "<null>";
+                    } // if
+                    form.callStack.Push(new Tuple<FuncName, StmtLabel, RetVal, List<string>>(form.currFunc.funcName, form.currStmt.stmtLabel, form.runContext.vars["retVal"], parameters));
+                    form.updateVariableTableRow($"retVal", "<?>", false, "All,Debug");
                     form.uiFuncList.SelectedIndex = funcIndex;
                     form.uiStmtList.SelectedIndex = form.uiStmtList.Items.Count == 0 ? -1 : 0;
                     form.uiInstList.SelectedIndex = form.uiInstList.Items.Count == 0 ? -1 : 0;
@@ -2371,6 +2927,49 @@ public class Instruction : ICloneable {
                     form.runWorker.RunWorkerAsync(form.currInst);
                     return false;
                 } else {
+                    switch (instParamLeft) { // check built-in functions
+                        case "split": { // splits the string in to array using separator
+                                string[] args = instParamRight.Split(',');
+                                args = args.Select(item => form.substituteVars(item)).ToArray();
+                                if (args[1].Length != 1) {
+                                    form.debugOut($"Error: split separator must be a single char: {args[1]}");
+                                } else {
+                                    form.runContext.arrays["retVal"] = new List<string>(args[0].Split(args[1][0]));
+                                    form.updateVariableTableRow($"@retVal", null, true, "All,Debug,Local");
+                                } // if
+                                return true;
+                            } // case split
+                        case "replace": { // replaces first string with 
+                                string[] args = instParamRight.Split(',');
+                                args = args.Select(item => form.substituteVars(item)).ToArray();
+                                if (args.Length != 3) {
+                                    form.debugOut($"Error: replace must be have three arguments.");
+                                } else {
+                                    form.runContext.vars["retVal"] = args[0].Replace(args[1], args[2]);
+                                    form.updateVariableTableRow($"retVal", form.runContext.vars["retVal"], false, "All,Debug,Local");
+                                } // if
+                                return true;
+                            } // case split
+                        case "max": case "min": {
+                                string[] args = instParamRight.Split(',');
+                                args = args.Select(item => form.substituteVars(item)).ToArray();
+                                try {
+                                    int[] intArgs = args.Select(item => int.Parse(item, NumberStyles.Integer)).ToArray();
+                                    var val = instParamLeft == "min" ? intArgs.Min() : intArgs.Max();
+                                    form.runContext.vars["retVal"] = $"{val}";
+                                } catch (Exception) {
+                                    try {
+                                        float[] intArgs = args.Select(item => float.Parse(item, NumberStyles.Float)).ToArray();
+                                        var val = instParamLeft == "min" ? intArgs.Min() : intArgs.Max();
+                                        form.runContext.vars["retVal"] = $"{val}";
+                                    } catch (Exception) {
+                                        var val = instParamLeft == "min" ? args.Min() : args.Max();
+                                        form.runContext.vars["retVal"] = $"{val}";
+                                    } // try
+                                } // try
+                                return true;
+                            } // case min, max
+                    } // switch
                     form.debugOut("Internal Error: function not found: " +
                         instParamLeft + " @statement=" + 
                         form.currStmt.stmtLabel);
@@ -2396,10 +2995,12 @@ public class Instruction : ICloneable {
                 if (form.callStack.Count != 0)
                 { // if there is a caller in the stack, push the return value
                     var tuples = form.callStack.Pop();
-                    form.callStack.Push(new Tuple<FuncName, StmtLabel, RetVal, List<string>>(tuples.Item1, tuples.Item2, instParamLeft, tuples.Item4
+                    var returnExpr = form.substituteVars(instParamLeft);
+                    form.callStack.Push(new Tuple<FuncName, StmtLabel, RetVal, List<string>>(tuples.Item1, tuples.Item2, returnExpr, tuples.Item4
                         ));
                 } // if
-                break;
+                form.runFinished();
+                return false;
             case InstructionType.SAT_ASSIGN:
                 if (instParamLeft[0] == '@') { // LHS array case
                     var colonIdx = instParamLeft.IndexOf(':');
@@ -2422,12 +3023,14 @@ public class Instruction : ICloneable {
                         if (instParamRight == "null")
                         { // remove array
                             form.runContext.arrays.Remove(arrName);
+                            form.updateVariableTableRow($"@{arrName}", "null", true, "All,Debug,Locals,Globals,Persistents");
                         } else { // @arr = d,s,g,d,d,f
                             form.runContext.arrays[arrName] = new List<string>();
                             var items = instParamRight.Split(',');
                             foreach(var item in items) {
                                 form.runContext.arrays[arrName].Add(form.substituteVars(item));
                             } // if
+                            form.updateVariableTableRow($"@{arrName}", string.Join(", ", form.runContext.arrays[arrName]), true, "All,Debug,Locals,Globals,Persistents");
                         } // if
                     } else { // @arr:idx|front|back = case
                         var arrName = instParamLeft.Substring(1, operatorIdx - 1);
@@ -2443,8 +3046,7 @@ public class Instruction : ICloneable {
                             form.programState = PROGRAM_STATE.STOP;
                             form.uiFunctionRun.Enabled = !form.uiFunctionRun.Enabled;
                             form.uiProgRun.Enabled = !form.uiProgRun.Enabled;
-                        }
-                        else {
+                        } else {
                             var elemIdx = int.Parse(form.substituteVars(indexVar));
                             if (removeIdx == -1) {
                                 form.runContext.arrays[arrName].Insert(elemIdx, form.substituteVars(instParamRight));
@@ -2466,10 +3068,13 @@ public class Instruction : ICloneable {
                         } // if
                     } // if
                 } else { // LHS variable case
-                    if (instParamRight == "null") { 
+                    if (instParamRight == "null") {
+                        form.updateVariableTableRow(instParamLeft, "null", false, "All");
                         form.runContext.vars.Remove(instParamLeft);
+                    } else {
+                        form.runContext.vars[instParamLeft] = form.substituteVars(instParamRight);
+                        form.updateVariableTableRow(instParamLeft, form.runContext.vars[instParamLeft], false, "All,Debug,Locals,Globals,Persistents");
                     } // if
-                    form.runContext.vars[instParamLeft] = form.substituteVars(instParamRight);
                 } // if
                 break;
             case InstructionType.SAT_STOP_PROGRAM:
@@ -2522,12 +3127,10 @@ public class Statement : ICloneable {
     public Statement (string _label) : this() {
         stmtLabel = _label;
     } // function Statement
-    public string text
-    {
-        get
-        {
+    public string text {
+        get {
             return isCommentedOut ? $"// {stmtLabel}" : stmtLabel;
-        }
+        } // get
     } // prop text
     public string stmtLabel;
     public bool isCommentedOut;
@@ -2550,7 +3153,6 @@ public class Function : ICloneable {
     } // function Function
     public string funcName;
     public List<Statement> stmtList;
-
     public object Clone() {
         Function retVal = new Function();
         retVal.funcName = funcName + "-Clone";
@@ -2573,32 +3175,42 @@ public class ImageVar {
         matchThreshold = "0.93";
     } // function ImageVar
     public ImageVar(Image _image, ImageLibrary il, PictureBox _pb) {
-        image = _image;
-        pb = _pb;
-        isOCRRectBox = false;
-        matchThreshold = "0.93";
-        int x = image.Width / 2;
-        int y = image.Height / 2;
-        actionOffset = x.ToString() + ","+ y.ToString();
-        bool isNamePresent(string name, ImageLibrary _il) {
-            foreach (ImageVar iv in _il.imageVars) {
-                if (iv.imageName == name) {
-                    return true;
-                } // if
-            } // foreach
-            return false;
-        } // function isNamePresent
-        int count = 1;
-        while (isNamePresent("Image_" + count, il)) {
-            count++;
-        } // while
-        imageName = "Image_" + count;
+        try {
+            image = _image;
+            pb = _pb;
+            isOCRRectBox = false;
+            matchThreshold = "0.93";
+            int x = image.Width / 2;
+            int y = image.Height / 2;
+            actionOffset = x.ToString() + ","+ y.ToString();
+            bool isNamePresent(string name, ImageLibrary _il) {
+                foreach (ImageVar iv in _il.imageVars) {
+                    foreach (var ivName in iv.getImageNames) {
+                        if (ivName == name) {
+                            return true;
+                        } // if
+                    } // foreach
+                } // foreach
+                return false;
+            } // function isNamePresent
+            int count = 1;
+            while (isNamePresent("Image_" + count, il)) {
+                count++;
+            } // while
+            imageName = "Image_" + count;
+        } catch (Exception ex) {
+            form.uiStatusLabel.Text = $"Internal error: {ex.Message}{form.checkBreak}";
+        } // try
     } // function ImageVar
     public void drawHotSpotOnPB() {
-        pb.Image = image;
-        form.updateTargetImage(ref pb, new Bitmap(pb.Image), actionOffset);
+        try {
+            pb.Image = image;
+            form.updateTargetImage(ref pb, new Bitmap(pb.Image), actionOffset);
+        } catch (Exception ex) {
+            form.uiStatusLabel.Text = $"Internal error: {ex.Message}{form.checkBreak}";
+        } // try
     } // function drawHotSpotOnPB
-    public string imageName;
+    public string imageName; // Comma separated list.
     [XmlIgnore]
     public PictureBox pb;
     [XmlIgnore]
@@ -2632,27 +3244,51 @@ public class ImageVar {
             } // if
         } // set
     } // imageAsBase64
-}
+    [XmlIgnore]
+    public List<string> getImageNames {
+        get {
+            List<string> retVal = new List<string>();
+            retVal.AddRange(imageName.Split(','));
+            return retVal;
+        } // get
+    } // getImageNames
+} // class ImageVar
 public class ImageLibrary {
+    private global::AIScreenAutomationApp.Form1 form {
+        get {
+            return global::AIScreenAutomationApp.Form1.gForm;
+        } // get
+    } // global::AIScreenAutomationApp.Form1 form
     public ImageLibrary() {
         imageVars = new List<ImageVar>();
         pb2ImageVar = new Dictionary<PictureBox, ImageVar>();
     } // function ImageLibrary
     public List<ImageVar> imageVars;
     public List<ImageVar> findImage(string imageName) {
-        string regex = Regex.Replace(imageName, "{.*?}", "(.*?)");
         List<ImageVar> retVal = new List<ImageVar>();
-        foreach(ImageVar iv in imageVars) {
-            if (Regex.IsMatch(iv.imageName, $"^{regex}$")) {
-                retVal.Add(iv);
-            } // if
-        } // foreach
+        try { 
+            string regex = Regex.Replace(imageName, "{.*?}", "(.*?)");
+            foreach(ImageVar iv in imageVars) {
+                foreach (var ivName in iv.getImageNames) {
+                    if (Regex.IsMatch(ivName, $"^{regex}$")) {
+                        retVal.Add(iv);
+                    } // if
+                } // foreach
+            } // foreach
+        } catch (Exception ex) {
+            form.uiStatusLabel.Text = $"Internal error: {ex.Message}{form.checkBreak}";
+        } // try
         return retVal;
     } // function findImage
     [XmlIgnore]
     public Dictionary<PictureBox, ImageVar> pb2ImageVar;
 } // class ImageLibrary
 public class Script {
+    private global::AIScreenAutomationApp.Form1 form {
+        get {
+            return global::AIScreenAutomationApp.Form1.gForm;
+        } // get
+    } // global::AIScreenAutomationApp.Form1 form
     public Script() {
         progName = "New App 1";
         funcList = new List<Function>();
@@ -2665,6 +3301,11 @@ public class Script {
 //    public ImageLibrary imageLibrary;
 } // class Program
 public class Folder {
+    private global::AIScreenAutomationApp.Form1 form {
+        get {
+            return global::AIScreenAutomationApp.Form1.gForm;
+        } // get
+    } // global::AIScreenAutomationApp.Form1 form
     public Folder() {
         progList = new List<Script>();
         imageLibrary = new ImageLibrary();

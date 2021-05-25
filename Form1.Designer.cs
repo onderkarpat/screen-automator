@@ -69,6 +69,7 @@ namespace AIScreenAutomationApp
             this.uiInstParamRight = new System.Windows.Forms.ComboBox();
             this.uiInstParams = new System.Windows.Forms.ComboBox();
             this.toolStrip2 = new System.Windows.Forms.ToolStrip();
+            this.uiInstRunButton = new System.Windows.Forms.ToolStripButton();
             this.uiInstMoveUpButton = new System.Windows.Forms.ToolStripButton();
             this.uiInstMoveDownButton = new System.Windows.Forms.ToolStripButton();
             this.uiInstAdd = new System.Windows.Forms.ToolStripButton();
@@ -103,7 +104,7 @@ namespace AIScreenAutomationApp
             this.toolStripSeparator2 = new System.Windows.Forms.ToolStripSeparator();
             this.statusStrip1 = new System.Windows.Forms.StatusStrip();
             this.uiStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
-            this.tabControl1 = new System.Windows.Forms.TabControl();
+            this.uiBoxCalibrateTab = new System.Windows.Forms.TabControl();
             this.tabPage1 = new System.Windows.Forms.TabPage();
             this.uiOutputWindow = new System.Windows.Forms.TextBox();
             this.uiImageLibraryTab = new System.Windows.Forms.TabPage();
@@ -111,6 +112,8 @@ namespace AIScreenAutomationApp
             this.uiILPasteClipboardImage = new System.Windows.Forms.ToolStripButton();
             this.uiILReplaceImage = new System.Windows.Forms.ToolStripButton();
             this.uiILDelImage = new System.Windows.Forms.ToolStripButton();
+            this.toolStripLabel5 = new System.Windows.Forms.ToolStripLabel();
+            this.uiILFilterName = new System.Windows.Forms.ToolStripTextBox();
             this.toolStripLabel2 = new System.Windows.Forms.ToolStripLabel();
             this.uiILImageName = new System.Windows.Forms.ToolStripTextBox();
             this.uiILSetHotSpot = new System.Windows.Forms.ToolStripButton();
@@ -126,35 +129,66 @@ namespace AIScreenAutomationApp
             this.tabPage3 = new System.Windows.Forms.TabPage();
             this.tabPage4 = new System.Windows.Forms.TabPage();
             this.uiDebugWindow = new System.Windows.Forms.TextBox();
+            this.tabPage2 = new System.Windows.Forms.TabPage();
+            this.uiBoxCalibrateCaptureImgPanel = new System.Windows.Forms.Panel();
+            this.uiBoxCalibrateCaptureImg = new System.Windows.Forms.PictureBox();
+            this.toolStrip6 = new System.Windows.Forms.ToolStrip();
+            this.uiBoxCalibratePasteCaptureImg = new System.Windows.Forms.ToolStripButton();
+            this.uiBoxCalibrateMatchButton = new System.Windows.Forms.ToolStripButton();
+            this.uiBoxCalibrateImgSelect = new System.Windows.Forms.ToolStripComboBox();
+            this.toolStripLabel4 = new System.Windows.Forms.ToolStripLabel();
+            this.toolStripComboBox1 = new System.Windows.Forms.ToolStripComboBox();
+            this.uiBoxCalibrateZoomLabel = new System.Windows.Forms.ToolStripLabel();
+            this.uiBoxCalibratePosValLabel = new System.Windows.Forms.ToolStripLabel();
+            this.uiBoxCalibrateExportButton = new System.Windows.Forms.ToolStripButton();
+            this.uiBoxCalibrateMatchImg = new System.Windows.Forms.PictureBox();
+            this.groupBox1 = new System.Windows.Forms.GroupBox();
+            this.uiVariablesTable = new System.Windows.Forms.DataGridView();
+            this.name = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Value = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.toolStrip5 = new System.Windows.Forms.ToolStrip();
+            this.toolStripLabel3 = new System.Windows.Forms.ToolStripLabel();
+            this.uiVariablesTableGroupList = new System.Windows.Forms.ToolStripComboBox();
+            this.uiVariablesTableDelButton = new System.Windows.Forms.ToolStripButton();
             this.uiStatementsGroupBox.SuspendLayout();
             this.toolStrip3.SuspendLayout();
             this.uiBasicBlockGroupBox.SuspendLayout();
             this.toolStrip2.SuspendLayout();
             this.toolStrip1.SuspendLayout();
             this.statusStrip1.SuspendLayout();
-            this.tabControl1.SuspendLayout();
+            this.uiBoxCalibrateTab.SuspendLayout();
             this.tabPage1.SuspendLayout();
             this.uiImageLibraryTab.SuspendLayout();
             this.toolStrip4.SuspendLayout();
             this.tabPage3.SuspendLayout();
             this.tabPage4.SuspendLayout();
+            this.tabPage2.SuspendLayout();
+            this.uiBoxCalibrateCaptureImgPanel.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.uiBoxCalibrateCaptureImg)).BeginInit();
+            this.toolStrip6.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.uiBoxCalibrateMatchImg)).BeginInit();
+            this.groupBox1.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.uiVariablesTable)).BeginInit();
+            this.toolStrip5.SuspendLayout();
             this.SuspendLayout();
             // 
             // uiStmtList
             // 
             this.uiStmtList.FormattingEnabled = true;
-            this.uiStmtList.Location = new System.Drawing.Point(6, 47);
+            this.uiStmtList.ItemHeight = 14;
+            this.uiStmtList.Location = new System.Drawing.Point(6, 51);
             this.uiStmtList.Name = "uiStmtList";
-            this.uiStmtList.Size = new System.Drawing.Size(276, 134);
+            this.uiStmtList.Size = new System.Drawing.Size(277, 144);
             this.uiStmtList.TabIndex = 0;
             this.uiStmtList.SelectedIndexChanged += new System.EventHandler(this.uiStmtListChanged);
             // 
             // uiInstList
             // 
             this.uiInstList.FormattingEnabled = true;
-            this.uiInstList.Location = new System.Drawing.Point(6, 77);
+            this.uiInstList.ItemHeight = 14;
+            this.uiInstList.Location = new System.Drawing.Point(6, 83);
             this.uiInstList.Name = "uiInstList";
-            this.uiInstList.Size = new System.Drawing.Size(331, 108);
+            this.uiInstList.Size = new System.Drawing.Size(331, 116);
             this.uiInstList.TabIndex = 7;
             this.uiInstList.SelectedIndexChanged += new System.EventHandler(this.uiInstListChanged);
             this.uiInstList.MouseDown += new System.Windows.Forms.MouseEventHandler(this.uiInstListItemClicked);
@@ -163,9 +197,9 @@ namespace AIScreenAutomationApp
             // 
             this.uiStatementsGroupBox.Controls.Add(this.toolStrip3);
             this.uiStatementsGroupBox.Controls.Add(this.uiStmtList);
-            this.uiStatementsGroupBox.Location = new System.Drawing.Point(12, 28);
+            this.uiStatementsGroupBox.Location = new System.Drawing.Point(12, 30);
             this.uiStatementsGroupBox.Name = "uiStatementsGroupBox";
-            this.uiStatementsGroupBox.Size = new System.Drawing.Size(288, 196);
+            this.uiStatementsGroupBox.Size = new System.Drawing.Size(288, 211);
             this.uiStatementsGroupBox.TabIndex = 14;
             this.uiStatementsGroupBox.TabStop = false;
             this.uiStatementsGroupBox.Text = "Statements";
@@ -195,6 +229,7 @@ namespace AIScreenAutomationApp
             this.uiStmtMoveUpButton.Name = "uiStmtMoveUpButton";
             this.uiStmtMoveUpButton.Size = new System.Drawing.Size(23, 22);
             this.uiStmtMoveUpButton.Text = "▲";
+            this.uiStmtMoveUpButton.ToolTipText = "Move selected statement up";
             this.uiStmtMoveUpButton.Click += new System.EventHandler(this.uiStmtMoveUpClicked);
             // 
             // toolStripButton3
@@ -205,6 +240,7 @@ namespace AIScreenAutomationApp
             this.toolStripButton3.Name = "toolStripButton3";
             this.toolStripButton3.Size = new System.Drawing.Size(23, 22);
             this.toolStripButton3.Text = "▼";
+            this.toolStripButton3.ToolTipText = "Move selected statement down";
             this.toolStripButton3.Click += new System.EventHandler(this.uiStmtMoveDownClicked);
             // 
             // toolStripButton4
@@ -215,6 +251,7 @@ namespace AIScreenAutomationApp
             this.toolStripButton4.Name = "toolStripButton4";
             this.toolStripButton4.Size = new System.Drawing.Size(23, 22);
             this.toolStripButton4.Text = "➕";
+            this.toolStripButton4.ToolTipText = "Add new statement";
             this.toolStripButton4.Click += new System.EventHandler(this.uiStmtAddClicked);
             // 
             // toolStripButton5
@@ -225,6 +262,7 @@ namespace AIScreenAutomationApp
             this.toolStripButton5.Name = "toolStripButton5";
             this.toolStripButton5.Size = new System.Drawing.Size(23, 22);
             this.toolStripButton5.Text = "🗑";
+            this.toolStripButton5.ToolTipText = "Delete current statement";
             this.toolStripButton5.Click += new System.EventHandler(this.uiStmtDelClicked);
             // 
             // toolStripButton6
@@ -235,6 +273,7 @@ namespace AIScreenAutomationApp
             this.toolStripButton6.Name = "toolStripButton6";
             this.toolStripButton6.Size = new System.Drawing.Size(27, 22);
             this.toolStripButton6.Text = "++";
+            this.toolStripButton6.ToolTipText = "Duplicate current statement";
             this.toolStripButton6.Click += new System.EventHandler(this.uiStmtDuplicateClicked);
             // 
             // uiStmtLabel
@@ -242,6 +281,7 @@ namespace AIScreenAutomationApp
             this.uiStmtLabel.Font = new System.Drawing.Font("Segoe UI", 9F);
             this.uiStmtLabel.Name = "uiStmtLabel";
             this.uiStmtLabel.Size = new System.Drawing.Size(100, 25);
+            this.uiStmtLabel.ToolTipText = "Change statement label";
             this.uiStmtLabel.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.uiStmtLabelKeyPress);
             // 
             // uiStmtCommentToggle
@@ -252,7 +292,7 @@ namespace AIScreenAutomationApp
             this.uiStmtCommentToggle.Name = "uiStmtCommentToggle";
             this.uiStmtCommentToggle.Size = new System.Drawing.Size(23, 22);
             this.uiStmtCommentToggle.Text = "//";
-            this.uiStmtCommentToggle.ToolTipText = "Comment out the statement";
+            this.uiStmtCommentToggle.ToolTipText = "Comment out selected statement";
             this.uiStmtCommentToggle.Click += new System.EventHandler(this.uiStmtCommentToggleClicked);
             // 
             // uiBasicBlockGroupBox
@@ -262,9 +302,9 @@ namespace AIScreenAutomationApp
             this.uiBasicBlockGroupBox.Controls.Add(this.toolStrip2);
             this.uiBasicBlockGroupBox.Controls.Add(this.uiInstSelect);
             this.uiBasicBlockGroupBox.Controls.Add(this.uiInstList);
-            this.uiBasicBlockGroupBox.Location = new System.Drawing.Point(306, 28);
+            this.uiBasicBlockGroupBox.Location = new System.Drawing.Point(306, 30);
             this.uiBasicBlockGroupBox.Name = "uiBasicBlockGroupBox";
-            this.uiBasicBlockGroupBox.Size = new System.Drawing.Size(343, 196);
+            this.uiBasicBlockGroupBox.Size = new System.Drawing.Size(343, 211);
             this.uiBasicBlockGroupBox.TabIndex = 16;
             this.uiBasicBlockGroupBox.TabStop = false;
             this.uiBasicBlockGroupBox.Text = "Instructions";
@@ -272,9 +312,9 @@ namespace AIScreenAutomationApp
             // uiInstParamRight
             // 
             this.uiInstParamRight.FormattingEnabled = true;
-            this.uiInstParamRight.Location = new System.Drawing.Point(222, 50);
+            this.uiInstParamRight.Location = new System.Drawing.Point(222, 54);
             this.uiInstParamRight.Name = "uiInstParamRight";
-            this.uiInstParamRight.Size = new System.Drawing.Size(115, 21);
+            this.uiInstParamRight.Size = new System.Drawing.Size(115, 22);
             this.uiInstParamRight.TabIndex = 24;
             this.uiInstParamRight.SelectedIndexChanged += new System.EventHandler(this.uiInstParamRight_SelectedIndexChanged);
             this.uiInstParamRight.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.uiInstParamsRightKeyPress);
@@ -282,9 +322,9 @@ namespace AIScreenAutomationApp
             // uiInstParams
             // 
             this.uiInstParams.FormattingEnabled = true;
-            this.uiInstParams.Location = new System.Drawing.Point(102, 50);
+            this.uiInstParams.Location = new System.Drawing.Point(102, 54);
             this.uiInstParams.Name = "uiInstParams";
-            this.uiInstParams.Size = new System.Drawing.Size(114, 21);
+            this.uiInstParams.Size = new System.Drawing.Size(115, 22);
             this.uiInstParams.Sorted = true;
             this.uiInstParams.TabIndex = 23;
             this.uiInstParams.DropDown += new System.EventHandler(this.uiInstParamListShow);
@@ -295,6 +335,7 @@ namespace AIScreenAutomationApp
             // 
             this.toolStrip2.BackColor = System.Drawing.Color.PapayaWhip;
             this.toolStrip2.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.uiInstRunButton,
             this.uiInstMoveUpButton,
             this.uiInstMoveDownButton,
             this.uiInstAdd,
@@ -309,6 +350,17 @@ namespace AIScreenAutomationApp
             this.toolStrip2.TabIndex = 22;
             this.toolStrip2.Text = "toolStrip2";
             // 
+            // uiInstRunButton
+            // 
+            this.uiInstRunButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
+            this.uiInstRunButton.Image = ((System.Drawing.Image)(resources.GetObject("uiInstRunButton.Image")));
+            this.uiInstRunButton.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.uiInstRunButton.Name = "uiInstRunButton";
+            this.uiInstRunButton.Size = new System.Drawing.Size(23, 22);
+            this.uiInstRunButton.Text = "▶️";
+            this.uiInstRunButton.ToolTipText = "Run current instruction only";
+            this.uiInstRunButton.Click += new System.EventHandler(this.uiInstRunButtonClicked);
+            // 
             // uiInstMoveUpButton
             // 
             this.uiInstMoveUpButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
@@ -317,6 +369,8 @@ namespace AIScreenAutomationApp
             this.uiInstMoveUpButton.Name = "uiInstMoveUpButton";
             this.uiInstMoveUpButton.Size = new System.Drawing.Size(23, 22);
             this.uiInstMoveUpButton.Text = "▲";
+            this.uiInstMoveUpButton.ToolTipText = "Move current statement up, some statements block this, call function must be the " +
+    "last instruction in the block";
             this.uiInstMoveUpButton.Click += new System.EventHandler(this.uiInstMoveUpClicked);
             // 
             // uiInstMoveDownButton
@@ -327,6 +381,8 @@ namespace AIScreenAutomationApp
             this.uiInstMoveDownButton.Name = "uiInstMoveDownButton";
             this.uiInstMoveDownButton.Size = new System.Drawing.Size(23, 22);
             this.uiInstMoveDownButton.Text = "▼";
+            this.uiInstMoveDownButton.ToolTipText = "Move current statement down, some statements block this, call function must be th" +
+    "e last instruction in the block";
             this.uiInstMoveDownButton.Click += new System.EventHandler(this.uiInstMoveDownClicked);
             // 
             // uiInstAdd
@@ -360,6 +416,7 @@ namespace AIScreenAutomationApp
             this.uiInstDuplicateButton.Name = "uiInstDuplicateButton";
             this.uiInstDuplicateButton.Size = new System.Drawing.Size(27, 22);
             this.uiInstDuplicateButton.Text = "++";
+            this.uiInstDuplicateButton.ToolTipText = "Duplicate instruction";
             // 
             // toolStripLabel1
             // 
@@ -383,6 +440,7 @@ namespace AIScreenAutomationApp
             "LE"});
             this.uiBBCondList.Name = "uiBBCondList";
             this.uiBBCondList.Size = new System.Drawing.Size(75, 23);
+            this.uiBBCondList.ToolTipText = "Set condition for the current instruction";
             this.uiBBCondList.SelectedIndexChanged += new System.EventHandler(this.uiBBCondChanged);
             // 
             // uiInstCommentToggle
@@ -401,9 +459,9 @@ namespace AIScreenAutomationApp
             this.uiInstSelect.AllowDrop = true;
             this.uiInstSelect.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.uiInstSelect.FormattingEnabled = true;
-            this.uiInstSelect.Location = new System.Drawing.Point(6, 50);
+            this.uiInstSelect.Location = new System.Drawing.Point(6, 54);
             this.uiInstSelect.Name = "uiInstSelect";
-            this.uiInstSelect.Size = new System.Drawing.Size(90, 21);
+            this.uiInstSelect.Size = new System.Drawing.Size(91, 22);
             this.uiInstSelect.TabIndex = 17;
             this.uiInstSelect.SelectedIndexChanged += new System.EventHandler(this.uiInstListSelectChanged);
             // 
@@ -412,14 +470,14 @@ namespace AIScreenAutomationApp
             this.uiTestTextBox.Location = new System.Drawing.Point(3, 3);
             this.uiTestTextBox.Multiline = true;
             this.uiTestTextBox.Name = "uiTestTextBox";
-            this.uiTestTextBox.Size = new System.Drawing.Size(424, 149);
+            this.uiTestTextBox.Size = new System.Drawing.Size(424, 160);
             this.uiTestTextBox.TabIndex = 19;
             // 
             // uiTestButton1
             // 
-            this.uiTestButton1.Location = new System.Drawing.Point(621, 17);
+            this.uiTestButton1.Location = new System.Drawing.Point(621, 18);
             this.uiTestButton1.Name = "uiTestButton1";
-            this.uiTestButton1.Size = new System.Drawing.Size(75, 23);
+            this.uiTestButton1.Size = new System.Drawing.Size(75, 25);
             this.uiTestButton1.TabIndex = 21;
             this.uiTestButton1.Text = "Button 1";
             this.uiTestButton1.UseVisualStyleBackColor = true;
@@ -427,9 +485,9 @@ namespace AIScreenAutomationApp
             // 
             // uiTestButton2
             // 
-            this.uiTestButton2.Location = new System.Drawing.Point(621, 45);
+            this.uiTestButton2.Location = new System.Drawing.Point(621, 48);
             this.uiTestButton2.Name = "uiTestButton2";
-            this.uiTestButton2.Size = new System.Drawing.Size(75, 23);
+            this.uiTestButton2.Size = new System.Drawing.Size(75, 25);
             this.uiTestButton2.TabIndex = 22;
             this.uiTestButton2.Text = "Button 2";
             this.uiTestButton2.UseVisualStyleBackColor = true;
@@ -437,34 +495,34 @@ namespace AIScreenAutomationApp
             // 
             // textBox1
             // 
-            this.textBox1.Location = new System.Drawing.Point(477, 21);
+            this.textBox1.Location = new System.Drawing.Point(477, 23);
             this.textBox1.Name = "textBox1";
-            this.textBox1.Size = new System.Drawing.Size(128, 20);
+            this.textBox1.Size = new System.Drawing.Size(127, 20);
             this.textBox1.TabIndex = 23;
             // 
             // label6
             // 
             this.label6.AutoSize = true;
-            this.label6.Location = new System.Drawing.Point(433, 27);
+            this.label6.Location = new System.Drawing.Point(433, 29);
             this.label6.Name = "label6";
-            this.label6.Size = new System.Drawing.Size(38, 13);
+            this.label6.Size = new System.Drawing.Size(38, 14);
             this.label6.TabIndex = 24;
             this.label6.Text = "Field 1";
             // 
             // label7
             // 
             this.label7.AutoSize = true;
-            this.label7.Location = new System.Drawing.Point(433, 53);
+            this.label7.Location = new System.Drawing.Point(433, 57);
             this.label7.Name = "label7";
-            this.label7.Size = new System.Drawing.Size(38, 13);
+            this.label7.Size = new System.Drawing.Size(38, 14);
             this.label7.TabIndex = 26;
             this.label7.Text = "Field 2";
             // 
             // textBox2
             // 
-            this.textBox2.Location = new System.Drawing.Point(477, 47);
+            this.textBox2.Location = new System.Drawing.Point(477, 51);
             this.textBox2.Name = "textBox2";
-            this.textBox2.Size = new System.Drawing.Size(128, 20);
+            this.textBox2.Size = new System.Drawing.Size(127, 20);
             this.textBox2.TabIndex = 25;
             // 
             // toolStrip1
@@ -488,7 +546,7 @@ namespace AIScreenAutomationApp
             this.toolStripSeparator2});
             this.toolStrip1.Location = new System.Drawing.Point(0, 0);
             this.toolStrip1.Name = "toolStrip1";
-            this.toolStrip1.Size = new System.Drawing.Size(749, 25);
+            this.toolStrip1.Size = new System.Drawing.Size(1023, 25);
             this.toolStrip1.TabIndex = 38;
             this.toolStrip1.Text = "toolStrip1";
             // 
@@ -500,6 +558,7 @@ namespace AIScreenAutomationApp
             this.uiProgRun.Name = "uiProgRun";
             this.uiProgRun.Size = new System.Drawing.Size(23, 22);
             this.uiProgRun.Text = "▶️";
+            this.uiProgRun.ToolTipText = "Find and run \"Main\" function in the current program";
             this.uiProgRun.Click += new System.EventHandler(this.uiProgRunClicked);
             // 
             // uiStopProgramButton
@@ -510,7 +569,7 @@ namespace AIScreenAutomationApp
             this.uiStopProgramButton.Name = "uiStopProgramButton";
             this.uiStopProgramButton.Size = new System.Drawing.Size(23, 22);
             this.uiStopProgramButton.Text = "❌";
-            this.uiStopProgramButton.ToolTipText = "Stop Program";
+            this.uiStopProgramButton.ToolTipText = "Stop the running program";
             this.uiStopProgramButton.Click += new System.EventHandler(this.uiProgStopClicked);
             // 
             // uiSaveButton
@@ -522,6 +581,7 @@ namespace AIScreenAutomationApp
             this.uiSaveButton.RightToLeftAutoMirrorImage = true;
             this.uiSaveButton.Size = new System.Drawing.Size(23, 22);
             this.uiSaveButton.Text = "🖫";
+            this.uiSaveButton.ToolTipText = "Save the changes to your UserProfile folder";
             this.uiSaveButton.Click += new System.EventHandler(this.uiSaveClicked);
             // 
             // uiLoadButton
@@ -532,6 +592,7 @@ namespace AIScreenAutomationApp
             this.uiLoadButton.Name = "uiLoadButton";
             this.uiLoadButton.Size = new System.Drawing.Size(23, 22);
             this.uiLoadButton.Text = "📂";
+            this.uiLoadButton.ToolTipText = "Load latest save from your UserProfile folder";
             this.uiLoadButton.Click += new System.EventHandler(this.uiLoadClicked);
             // 
             // toolStripSeparator3
@@ -547,12 +608,14 @@ namespace AIScreenAutomationApp
             this.uiNewProgButton.Name = "uiNewProgButton";
             this.uiNewProgButton.Size = new System.Drawing.Size(84, 22);
             this.uiNewProgButton.Text = "New Program";
+            this.uiNewProgButton.ToolTipText = "Create new program";
             this.uiNewProgButton.Click += new System.EventHandler(this.uiProgNewClicked);
             // 
             // uiProgList
             // 
             this.uiProgList.Name = "uiProgList";
             this.uiProgList.Size = new System.Drawing.Size(121, 25);
+            this.uiProgList.ToolTipText = "Change the name of current program with <enter>, or select another program";
             this.uiProgList.SelectedIndexChanged += new System.EventHandler(this.uiProgListChanged);
             this.uiProgList.Leave += new System.EventHandler(this.uiProgListNameChanged);
             this.uiProgList.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.uiProgListKeyPress);
@@ -565,6 +628,7 @@ namespace AIScreenAutomationApp
             this.uiDelProgButton.Name = "uiDelProgButton";
             this.uiDelProgButton.Size = new System.Drawing.Size(23, 22);
             this.uiDelProgButton.Text = "🗑";
+            this.uiDelProgButton.ToolTipText = "Delete current program";
             this.uiDelProgButton.Click += new System.EventHandler(this.uiProgDelClicked);
             // 
             // toolStripSeparator1
@@ -580,6 +644,7 @@ namespace AIScreenAutomationApp
             this.uiNewFuncButton.Name = "uiNewFuncButton";
             this.uiNewFuncButton.Size = new System.Drawing.Size(85, 22);
             this.uiNewFuncButton.Text = "New Function";
+            this.uiNewFuncButton.ToolTipText = "Create new function";
             this.uiNewFuncButton.Click += new System.EventHandler(this.uiFuncNewClicked);
             // 
             // uiFuncList
@@ -587,6 +652,7 @@ namespace AIScreenAutomationApp
             this.uiFuncList.BackColor = System.Drawing.Color.Moccasin;
             this.uiFuncList.Name = "uiFuncList";
             this.uiFuncList.Size = new System.Drawing.Size(171, 25);
+            this.uiFuncList.ToolTipText = "Change the name of current function with <enter>, or select another funciton";
             this.uiFuncList.SelectedIndexChanged += new System.EventHandler(this.uiFuncListChanged);
             this.uiFuncList.Leave += new System.EventHandler(this.uiFuncListNameChanged);
             this.uiFuncList.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.uiFuncListKeyPress);
@@ -599,7 +665,7 @@ namespace AIScreenAutomationApp
             this.uiDelFuncButton.Name = "uiDelFuncButton";
             this.uiDelFuncButton.Size = new System.Drawing.Size(23, 22);
             this.uiDelFuncButton.Text = "🗑";
-            this.uiDelFuncButton.ToolTipText = "Delete function";
+            this.uiDelFuncButton.ToolTipText = "Delete current function";
             this.uiDelFuncButton.Click += new System.EventHandler(this.uiFuncDelClicked);
             // 
             // uiFunctionRun
@@ -633,9 +699,10 @@ namespace AIScreenAutomationApp
             // 
             this.statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.uiStatusLabel});
-            this.statusStrip1.Location = new System.Drawing.Point(0, 420);
+            this.statusStrip1.Location = new System.Drawing.Point(0, 496);
             this.statusStrip1.Name = "statusStrip1";
-            this.statusStrip1.Size = new System.Drawing.Size(749, 22);
+            this.statusStrip1.Padding = new System.Windows.Forms.Padding(1, 0, 15, 0);
+            this.statusStrip1.Size = new System.Drawing.Size(1023, 22);
             this.statusStrip1.TabIndex = 39;
             this.statusStrip1.Text = "statusStrip1";
             // 
@@ -644,28 +711,29 @@ namespace AIScreenAutomationApp
             this.uiStatusLabel.Name = "uiStatusLabel";
             this.uiStatusLabel.Size = new System.Drawing.Size(0, 17);
             // 
-            // tabControl1
+            // uiBoxCalibrateTab
             // 
-            this.tabControl1.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            this.uiBoxCalibrateTab.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.tabControl1.Controls.Add(this.tabPage1);
-            this.tabControl1.Controls.Add(this.uiImageLibraryTab);
-            this.tabControl1.Controls.Add(this.tabPage3);
-            this.tabControl1.Controls.Add(this.tabPage4);
-            this.tabControl1.Location = new System.Drawing.Point(12, 230);
-            this.tabControl1.Name = "tabControl1";
-            this.tabControl1.SelectedIndex = 0;
-            this.tabControl1.Size = new System.Drawing.Size(728, 187);
-            this.tabControl1.TabIndex = 40;
+            this.uiBoxCalibrateTab.Controls.Add(this.tabPage1);
+            this.uiBoxCalibrateTab.Controls.Add(this.uiImageLibraryTab);
+            this.uiBoxCalibrateTab.Controls.Add(this.tabPage3);
+            this.uiBoxCalibrateTab.Controls.Add(this.tabPage4);
+            this.uiBoxCalibrateTab.Controls.Add(this.tabPage2);
+            this.uiBoxCalibrateTab.Location = new System.Drawing.Point(12, 248);
+            this.uiBoxCalibrateTab.Name = "uiBoxCalibrateTab";
+            this.uiBoxCalibrateTab.SelectedIndex = 0;
+            this.uiBoxCalibrateTab.Size = new System.Drawing.Size(1002, 243);
+            this.uiBoxCalibrateTab.TabIndex = 40;
             // 
             // tabPage1
             // 
             this.tabPage1.Controls.Add(this.uiOutputWindow);
-            this.tabPage1.Location = new System.Drawing.Point(4, 22);
+            this.tabPage1.Location = new System.Drawing.Point(4, 23);
             this.tabPage1.Name = "tabPage1";
             this.tabPage1.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPage1.Size = new System.Drawing.Size(720, 161);
+            this.tabPage1.Size = new System.Drawing.Size(994, 216);
             this.tabPage1.TabIndex = 0;
             this.tabPage1.Text = "Output Window";
             this.tabPage1.UseVisualStyleBackColor = true;
@@ -675,21 +743,21 @@ namespace AIScreenAutomationApp
             this.uiOutputWindow.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.uiOutputWindow.Location = new System.Drawing.Point(4, 7);
+            this.uiOutputWindow.Location = new System.Drawing.Point(3, 8);
             this.uiOutputWindow.Multiline = true;
             this.uiOutputWindow.Name = "uiOutputWindow";
             this.uiOutputWindow.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.uiOutputWindow.Size = new System.Drawing.Size(710, 142);
+            this.uiOutputWindow.Size = new System.Drawing.Size(985, 153);
             this.uiOutputWindow.TabIndex = 0;
             // 
             // uiImageLibraryTab
             // 
             this.uiImageLibraryTab.Controls.Add(this.toolStrip4);
             this.uiImageLibraryTab.Controls.Add(this.uiImageLibrary);
-            this.uiImageLibraryTab.Location = new System.Drawing.Point(4, 22);
+            this.uiImageLibraryTab.Location = new System.Drawing.Point(4, 23);
             this.uiImageLibraryTab.Name = "uiImageLibraryTab";
             this.uiImageLibraryTab.Padding = new System.Windows.Forms.Padding(3);
-            this.uiImageLibraryTab.Size = new System.Drawing.Size(720, 161);
+            this.uiImageLibraryTab.Size = new System.Drawing.Size(994, 216);
             this.uiImageLibraryTab.TabIndex = 1;
             this.uiImageLibraryTab.Text = "Image Library";
             this.uiImageLibraryTab.UseVisualStyleBackColor = true;
@@ -700,6 +768,8 @@ namespace AIScreenAutomationApp
             this.uiILPasteClipboardImage,
             this.uiILReplaceImage,
             this.uiILDelImage,
+            this.toolStripLabel5,
+            this.uiILFilterName,
             this.toolStripLabel2,
             this.uiILImageName,
             this.uiILSetHotSpot,
@@ -713,7 +783,7 @@ namespace AIScreenAutomationApp
             this.uiILSetThreshold});
             this.toolStrip4.Location = new System.Drawing.Point(3, 3);
             this.toolStrip4.Name = "toolStrip4";
-            this.toolStrip4.Size = new System.Drawing.Size(714, 25);
+            this.toolStrip4.Size = new System.Drawing.Size(988, 25);
             this.toolStrip4.TabIndex = 1;
             this.toolStrip4.Text = "toolStrip4";
             // 
@@ -725,6 +795,7 @@ namespace AIScreenAutomationApp
             this.uiILPasteClipboardImage.Name = "uiILPasteClipboardImage";
             this.uiILPasteClipboardImage.Size = new System.Drawing.Size(23, 22);
             this.uiILPasteClipboardImage.Text = "➕";
+            this.uiILPasteClipboardImage.ToolTipText = "Paste clipboard image to the library";
             this.uiILPasteClipboardImage.Click += new System.EventHandler(this.uiILPasteClipboardImageClicked);
             // 
             // uiILReplaceImage
@@ -735,6 +806,7 @@ namespace AIScreenAutomationApp
             this.uiILReplaceImage.Name = "uiILReplaceImage";
             this.uiILReplaceImage.Size = new System.Drawing.Size(23, 22);
             this.uiILReplaceImage.Text = "↶";
+            this.uiILReplaceImage.ToolTipText = "Replace selected image with the image in the clipboard";
             this.uiILReplaceImage.Click += new System.EventHandler(this.uiILReplaceImageClicked);
             // 
             // uiILDelImage
@@ -745,7 +817,22 @@ namespace AIScreenAutomationApp
             this.uiILDelImage.Name = "uiILDelImage";
             this.uiILDelImage.Size = new System.Drawing.Size(23, 22);
             this.uiILDelImage.Text = "🗑";
+            this.uiILDelImage.ToolTipText = "Delete selected image";
             this.uiILDelImage.Click += new System.EventHandler(this.uiILImageDelClicked);
+            // 
+            // toolStripLabel5
+            // 
+            this.toolStripLabel5.Name = "toolStripLabel5";
+            this.toolStripLabel5.Size = new System.Drawing.Size(36, 22);
+            this.toolStripLabel5.Text = "Filter:";
+            // 
+            // uiILFilterName
+            // 
+            this.uiILFilterName.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.uiILFilterName.Name = "uiILFilterName";
+            this.uiILFilterName.Size = new System.Drawing.Size(100, 25);
+            this.uiILFilterName.ToolTipText = "Filter images listed in the image library";
+            this.uiILFilterName.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.uiILFilterName_TextChanged);
             // 
             // toolStripLabel2
             // 
@@ -758,6 +845,7 @@ namespace AIScreenAutomationApp
             this.uiILImageName.Font = new System.Drawing.Font("Segoe UI", 9F);
             this.uiILImageName.Name = "uiILImageName";
             this.uiILImageName.Size = new System.Drawing.Size(100, 25);
+            this.uiILImageName.ToolTipText = "Current name of the image, can be changed by pressing <enter>";
             this.uiILImageName.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.uiILImageNameChanged);
             // 
             // uiILSetHotSpot
@@ -769,7 +857,7 @@ namespace AIScreenAutomationApp
             this.uiILSetHotSpot.Name = "uiILSetHotSpot";
             this.uiILSetHotSpot.Size = new System.Drawing.Size(23, 22);
             this.uiILSetHotSpot.Text = "🎯";
-            this.uiILSetHotSpot.ToolTipText = "Set Hot Spot";
+            this.uiILSetHotSpot.ToolTipText = "Set hot spot for mouse actions";
             // 
             // uiILToggleOriginalSize
             // 
@@ -792,18 +880,17 @@ namespace AIScreenAutomationApp
             this.uiILSetSearchRect.Name = "uiILSetSearchRect";
             this.uiILSetSearchRect.Size = new System.Drawing.Size(23, 22);
             this.uiILSetSearchRect.Text = "🔍";
-            this.uiILSetSearchRect.ToolTipText = "Set search rectangle";
+            this.uiILSetSearchRect.ToolTipText = "Set search rectangle within image";
             // 
             // uiILOCRBoxButton
             // 
-            this.uiILOCRBoxButton.CheckOnClick = true;
             this.uiILOCRBoxButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
             this.uiILOCRBoxButton.Image = ((System.Drawing.Image)(resources.GetObject("uiILOCRBoxButton.Image")));
             this.uiILOCRBoxButton.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.uiILOCRBoxButton.Name = "uiILOCRBoxButton";
             this.uiILOCRBoxButton.Size = new System.Drawing.Size(23, 22);
             this.uiILOCRBoxButton.Text = "❏";
-            this.uiILOCRBoxButton.ToolTipText = "Set OCR box";
+            this.uiILOCRBoxButton.ToolTipText = "Mouse drag select OCR rect and copy to clipboard (experimental)";
             this.uiILOCRBoxButton.Click += new System.EventHandler(this.uiILOCRBoxButtonClicked);
             // 
             // uiILSetOCRRect
@@ -815,6 +902,7 @@ namespace AIScreenAutomationApp
             this.uiILSetOCRRect.Name = "uiILSetOCRRect";
             this.uiILSetOCRRect.Size = new System.Drawing.Size(23, 22);
             this.uiILSetOCRRect.Text = "🗚";
+            this.uiILSetOCRRect.ToolTipText = "Set OCR box within image (typically smaller than search rect)";
             // 
             // uiILShowOCROut
             // 
@@ -825,6 +913,7 @@ namespace AIScreenAutomationApp
             this.uiILShowOCROut.Size = new System.Drawing.Size(81, 22);
             this.uiILShowOCROut.Text = "showOCRout";
             this.uiILShowOCROut.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+            this.uiILShowOCROut.ToolTipText = "Show OCR output for the selected image, uses parameters on the right";
             this.uiILShowOCROut.Click += new System.EventHandler(this.uiILShowOCROutClicked);
             // 
             // uiILOCRParams
@@ -832,6 +921,9 @@ namespace AIScreenAutomationApp
             this.uiILOCRParams.Font = new System.Drawing.Font("Segoe UI", 9F);
             this.uiILOCRParams.Name = "uiILOCRParams";
             this.uiILOCRParams.Size = new System.Drawing.Size(100, 25);
+            this.uiILOCRParams.ToolTipText = "Comma separated list of OCR parameters (match threshold[0-1.0], scale image[1-4]," +
+    "smoothing filter[kernel size, color sigma], invert colors[0/1], image binary thr" +
+    "eshold[0-255])";
             // 
             // toolStripButton2
             // 
@@ -841,7 +933,7 @@ namespace AIScreenAutomationApp
             this.toolStripButton2.Name = "toolStripButton2";
             this.toolStripButton2.Size = new System.Drawing.Size(23, 22);
             this.toolStripButton2.Text = "¿";
-            this.toolStripButton2.ToolTipText = "Check match result";
+            this.toolStripButton2.ToolTipText = "Check match result from current screen shot";
             this.toolStripButton2.Click += new System.EventHandler(this.uiILCheckMatchResult);
             // 
             // uiILSetThreshold
@@ -852,6 +944,7 @@ namespace AIScreenAutomationApp
             this.uiILSetThreshold.Name = "uiILSetThreshold";
             this.uiILSetThreshold.Size = new System.Drawing.Size(23, 22);
             this.uiILSetThreshold.Text = "📈";
+            this.uiILSetThreshold.ToolTipText = "Save image parameters";
             this.uiILSetThreshold.Click += new System.EventHandler(this.uiILSetThresholdClicked);
             // 
             // uiImageLibrary
@@ -860,10 +953,14 @@ namespace AIScreenAutomationApp
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.uiImageLibrary.AutoScroll = true;
-            this.uiImageLibrary.Location = new System.Drawing.Point(7, 37);
+            this.uiImageLibrary.ForeColor = System.Drawing.SystemColors.ActiveBorder;
+            this.uiImageLibrary.Location = new System.Drawing.Point(7, 40);
+            this.uiImageLibrary.Margin = new System.Windows.Forms.Padding(13, 14, 13, 14);
             this.uiImageLibrary.Name = "uiImageLibrary";
-            this.uiImageLibrary.Size = new System.Drawing.Size(731, 112);
+            this.uiImageLibrary.Padding = new System.Windows.Forms.Padding(9, 11, 9, 11);
+            this.uiImageLibrary.Size = new System.Drawing.Size(984, 121);
             this.uiImageLibrary.TabIndex = 0;
+            this.uiImageLibrary.Visible = false;
             // 
             // tabPage3
             // 
@@ -874,9 +971,9 @@ namespace AIScreenAutomationApp
             this.tabPage3.Controls.Add(this.textBox2);
             this.tabPage3.Controls.Add(this.uiTestButton1);
             this.tabPage3.Controls.Add(this.label7);
-            this.tabPage3.Location = new System.Drawing.Point(4, 22);
+            this.tabPage3.Location = new System.Drawing.Point(4, 23);
             this.tabPage3.Name = "tabPage3";
-            this.tabPage3.Size = new System.Drawing.Size(720, 161);
+            this.tabPage3.Size = new System.Drawing.Size(994, 216);
             this.tabPage3.TabIndex = 2;
             this.tabPage3.Text = "Test Area";
             this.tabPage3.UseVisualStyleBackColor = true;
@@ -884,9 +981,9 @@ namespace AIScreenAutomationApp
             // tabPage4
             // 
             this.tabPage4.Controls.Add(this.uiDebugWindow);
-            this.tabPage4.Location = new System.Drawing.Point(4, 22);
+            this.tabPage4.Location = new System.Drawing.Point(4, 23);
             this.tabPage4.Name = "tabPage4";
-            this.tabPage4.Size = new System.Drawing.Size(720, 161);
+            this.tabPage4.Size = new System.Drawing.Size(994, 216);
             this.tabPage4.TabIndex = 3;
             this.tabPage4.Text = "Debug Window";
             this.tabPage4.UseVisualStyleBackColor = true;
@@ -900,20 +997,224 @@ namespace AIScreenAutomationApp
             this.uiDebugWindow.Multiline = true;
             this.uiDebugWindow.Name = "uiDebugWindow";
             this.uiDebugWindow.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.uiDebugWindow.Size = new System.Drawing.Size(738, 142);
+            this.uiDebugWindow.Size = new System.Drawing.Size(739, 153);
             this.uiDebugWindow.TabIndex = 1;
+            // 
+            // tabPage2
+            // 
+            this.tabPage2.Controls.Add(this.uiBoxCalibrateCaptureImgPanel);
+            this.tabPage2.Controls.Add(this.toolStrip6);
+            this.tabPage2.Controls.Add(this.uiBoxCalibrateMatchImg);
+            this.tabPage2.Location = new System.Drawing.Point(4, 23);
+            this.tabPage2.Name = "tabPage2";
+            this.tabPage2.Padding = new System.Windows.Forms.Padding(3);
+            this.tabPage2.Size = new System.Drawing.Size(994, 216);
+            this.tabPage2.TabIndex = 4;
+            this.tabPage2.Text = "Box Calibrate";
+            this.tabPage2.UseVisualStyleBackColor = true;
+            // 
+            // uiBoxCalibrateCaptureImgPanel
+            // 
+            this.uiBoxCalibrateCaptureImgPanel.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left)));
+            this.uiBoxCalibrateCaptureImgPanel.BackColor = System.Drawing.Color.Turquoise;
+            this.uiBoxCalibrateCaptureImgPanel.Controls.Add(this.uiBoxCalibrateCaptureImg);
+            this.uiBoxCalibrateCaptureImgPanel.Location = new System.Drawing.Point(6, 31);
+            this.uiBoxCalibrateCaptureImgPanel.Name = "uiBoxCalibrateCaptureImgPanel";
+            this.uiBoxCalibrateCaptureImgPanel.Size = new System.Drawing.Size(471, 179);
+            this.uiBoxCalibrateCaptureImgPanel.TabIndex = 4;
+            // 
+            // uiBoxCalibrateCaptureImg
+            // 
+            this.uiBoxCalibrateCaptureImg.BackColor = System.Drawing.Color.Violet;
+            this.uiBoxCalibrateCaptureImg.Location = new System.Drawing.Point(12, 13);
+            this.uiBoxCalibrateCaptureImg.Name = "uiBoxCalibrateCaptureImg";
+            this.uiBoxCalibrateCaptureImg.Size = new System.Drawing.Size(445, 150);
+            this.uiBoxCalibrateCaptureImg.TabIndex = 0;
+            this.uiBoxCalibrateCaptureImg.TabStop = false;
+            // 
+            // toolStrip6
+            // 
+            this.toolStrip6.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.uiBoxCalibratePasteCaptureImg,
+            this.uiBoxCalibrateMatchButton,
+            this.uiBoxCalibrateImgSelect,
+            this.toolStripLabel4,
+            this.toolStripComboBox1,
+            this.uiBoxCalibrateZoomLabel,
+            this.uiBoxCalibratePosValLabel,
+            this.uiBoxCalibrateExportButton});
+            this.toolStrip6.Location = new System.Drawing.Point(3, 3);
+            this.toolStrip6.Name = "toolStrip6";
+            this.toolStrip6.Size = new System.Drawing.Size(988, 28);
+            this.toolStrip6.TabIndex = 3;
+            this.toolStrip6.Text = "toolStrip6";
+            // 
+            // uiBoxCalibratePasteCaptureImg
+            // 
+            this.uiBoxCalibratePasteCaptureImg.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
+            this.uiBoxCalibratePasteCaptureImg.Image = ((System.Drawing.Image)(resources.GetObject("uiBoxCalibratePasteCaptureImg.Image")));
+            this.uiBoxCalibratePasteCaptureImg.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.uiBoxCalibratePasteCaptureImg.Name = "uiBoxCalibratePasteCaptureImg";
+            this.uiBoxCalibratePasteCaptureImg.Size = new System.Drawing.Size(23, 25);
+            this.uiBoxCalibratePasteCaptureImg.Text = "➕";
+            this.uiBoxCalibratePasteCaptureImg.Click += new System.EventHandler(this.uiBoxCalibratePasteCaptureImg_Click);
+            // 
+            // uiBoxCalibrateMatchButton
+            // 
+            this.uiBoxCalibrateMatchButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
+            this.uiBoxCalibrateMatchButton.Image = ((System.Drawing.Image)(resources.GetObject("uiBoxCalibrateMatchButton.Image")));
+            this.uiBoxCalibrateMatchButton.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.uiBoxCalibrateMatchButton.Name = "uiBoxCalibrateMatchButton";
+            this.uiBoxCalibrateMatchButton.Size = new System.Drawing.Size(45, 25);
+            this.uiBoxCalibrateMatchButton.Text = "Match";
+            this.uiBoxCalibrateMatchButton.Click += new System.EventHandler(this.uiBoxCalibrateMatchButton_Click);
+            // 
+            // uiBoxCalibrateImgSelect
+            // 
+            this.uiBoxCalibrateImgSelect.Name = "uiBoxCalibrateImgSelect";
+            this.uiBoxCalibrateImgSelect.Size = new System.Drawing.Size(121, 28);
+            this.uiBoxCalibrateImgSelect.DropDown += new System.EventHandler(this.uiBoxCalibrateImgSelect_DropDown);
+            this.uiBoxCalibrateImgSelect.SelectedIndexChanged += new System.EventHandler(this.uiBoxCalibrateImgSelect_SelectedIndexChanged);
+            // 
+            // toolStripLabel4
+            // 
+            this.toolStripLabel4.Name = "toolStripLabel4";
+            this.toolStripLabel4.Size = new System.Drawing.Size(46, 25);
+            this.toolStripLabel4.Text = "Params";
+            // 
+            // toolStripComboBox1
+            // 
+            this.toolStripComboBox1.Name = "toolStripComboBox1";
+            this.toolStripComboBox1.Size = new System.Drawing.Size(121, 28);
+            // 
+            // uiBoxCalibrateZoomLabel
+            // 
+            this.uiBoxCalibrateZoomLabel.Name = "uiBoxCalibrateZoomLabel";
+            this.uiBoxCalibrateZoomLabel.Size = new System.Drawing.Size(72, 25);
+            this.uiBoxCalibrateZoomLabel.Text = "Zoom: @x%";
+            // 
+            // uiBoxCalibratePosValLabel
+            // 
+            this.uiBoxCalibratePosValLabel.Name = "uiBoxCalibratePosValLabel";
+            this.uiBoxCalibratePosValLabel.Size = new System.Drawing.Size(88, 25);
+            this.uiBoxCalibratePosValLabel.Text = "pixelInfo: x,y=v";
+            // 
+            // uiBoxCalibrateExportButton
+            // 
+            this.uiBoxCalibrateExportButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
+            this.uiBoxCalibrateExportButton.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.uiBoxCalibrateExportButton.Image = ((System.Drawing.Image)(resources.GetObject("uiBoxCalibrateExportButton.Image")));
+            this.uiBoxCalibrateExportButton.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.uiBoxCalibrateExportButton.Name = "uiBoxCalibrateExportButton";
+            this.uiBoxCalibrateExportButton.Size = new System.Drawing.Size(36, 25);
+            this.uiBoxCalibrateExportButton.Text = "🚁";
+            this.uiBoxCalibrateExportButton.ToolTipText = "Export image data to clipboard as text for Excel.";
+            this.uiBoxCalibrateExportButton.Click += new System.EventHandler(this.uiBoxCalibrateExportButton_Click);
+            // 
+            // uiBoxCalibrateMatchImg
+            // 
+            this.uiBoxCalibrateMatchImg.Location = new System.Drawing.Point(501, 31);
+            this.uiBoxCalibrateMatchImg.Name = "uiBoxCalibrateMatchImg";
+            this.uiBoxCalibrateMatchImg.Size = new System.Drawing.Size(487, 49);
+            this.uiBoxCalibrateMatchImg.TabIndex = 1;
+            this.uiBoxCalibrateMatchImg.TabStop = false;
+            // 
+            // groupBox1
+            // 
+            this.groupBox1.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.groupBox1.Controls.Add(this.uiVariablesTable);
+            this.groupBox1.Controls.Add(this.toolStrip5);
+            this.groupBox1.Location = new System.Drawing.Point(655, 30);
+            this.groupBox1.Name = "groupBox1";
+            this.groupBox1.Size = new System.Drawing.Size(356, 211);
+            this.groupBox1.TabIndex = 25;
+            this.groupBox1.TabStop = false;
+            this.groupBox1.Text = "Variables";
+            // 
+            // uiVariablesTable
+            // 
+            this.uiVariablesTable.AllowUserToAddRows = false;
+            this.uiVariablesTable.AllowUserToDeleteRows = false;
+            this.uiVariablesTable.AllowUserToResizeRows = false;
+            this.uiVariablesTable.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.uiVariablesTable.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            this.uiVariablesTable.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
+            this.name,
+            this.Value});
+            this.uiVariablesTable.Location = new System.Drawing.Point(6, 54);
+            this.uiVariablesTable.Name = "uiVariablesTable";
+            this.uiVariablesTable.Size = new System.Drawing.Size(343, 145);
+            this.uiVariablesTable.TabIndex = 23;
+            this.uiVariablesTable.RowHeaderMouseClick += new System.Windows.Forms.DataGridViewCellMouseEventHandler(this.uiVariablesTable_RowHeaderMouseClick);
+            // 
+            // name
+            // 
+            this.name.HeaderText = "Name";
+            this.name.Name = "name";
+            // 
+            // Value
+            // 
+            this.Value.HeaderText = "Value";
+            this.Value.Name = "Value";
+            // 
+            // toolStrip5
+            // 
+            this.toolStrip5.BackColor = System.Drawing.Color.PapayaWhip;
+            this.toolStrip5.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.toolStripLabel3,
+            this.uiVariablesTableGroupList,
+            this.uiVariablesTableDelButton});
+            this.toolStrip5.Location = new System.Drawing.Point(3, 16);
+            this.toolStrip5.Name = "toolStrip5";
+            this.toolStrip5.Size = new System.Drawing.Size(350, 25);
+            this.toolStrip5.TabIndex = 22;
+            this.toolStrip5.Text = "toolStrip5";
+            // 
+            // toolStripLabel3
+            // 
+            this.toolStripLabel3.Name = "toolStripLabel3";
+            this.toolStripLabel3.Size = new System.Drawing.Size(43, 22);
+            this.toolStripLabel3.Text = "Group:";
+            // 
+            // uiVariablesTableGroupList
+            // 
+            this.uiVariablesTableGroupList.AutoSize = false;
+            this.uiVariablesTableGroupList.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.uiVariablesTableGroupList.DropDownWidth = 60;
+            this.uiVariablesTableGroupList.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.uiVariablesTableGroupList.Name = "uiVariablesTableGroupList";
+            this.uiVariablesTableGroupList.Size = new System.Drawing.Size(75, 23);
+            this.uiVariablesTableGroupList.ToolTipText = "Filter variables by group";
+            this.uiVariablesTableGroupList.SelectedIndexChanged += new System.EventHandler(this.uiVariablesTableGroupListSelectChanged);
+            // 
+            // uiVariablesTableDelButton
+            // 
+            this.uiVariablesTableDelButton.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
+            this.uiVariablesTableDelButton.Image = ((System.Drawing.Image)(resources.GetObject("uiVariablesTableDelButton.Image")));
+            this.uiVariablesTableDelButton.ImageTransparentColor = System.Drawing.Color.Magenta;
+            this.uiVariablesTableDelButton.Name = "uiVariablesTableDelButton";
+            this.uiVariablesTableDelButton.Size = new System.Drawing.Size(23, 22);
+            this.uiVariablesTableDelButton.Text = "🗑";
+            this.uiVariablesTableDelButton.ToolTipText = "clear variables from the table";
+            this.uiVariablesTableDelButton.Click += new System.EventHandler(this.uiVariablesTableDelButtonClicked);
             // 
             // Form1
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
+            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 14F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.PapayaWhip;
-            this.ClientSize = new System.Drawing.Size(749, 442);
-            this.Controls.Add(this.tabControl1);
+            this.ClientSize = new System.Drawing.Size(1023, 518);
+            this.Controls.Add(this.groupBox1);
+            this.Controls.Add(this.uiBoxCalibrateTab);
             this.Controls.Add(this.statusStrip1);
             this.Controls.Add(this.toolStrip1);
             this.Controls.Add(this.uiBasicBlockGroupBox);
             this.Controls.Add(this.uiStatementsGroupBox);
+            this.Font = new System.Drawing.Font("Arial", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.Name = "Form1";
             this.Text = "Screen Automator";
             this.uiStatementsGroupBox.ResumeLayout(false);
@@ -928,7 +1229,7 @@ namespace AIScreenAutomationApp
             this.toolStrip1.PerformLayout();
             this.statusStrip1.ResumeLayout(false);
             this.statusStrip1.PerformLayout();
-            this.tabControl1.ResumeLayout(false);
+            this.uiBoxCalibrateTab.ResumeLayout(false);
             this.tabPage1.ResumeLayout(false);
             this.tabPage1.PerformLayout();
             this.uiImageLibraryTab.ResumeLayout(false);
@@ -939,6 +1240,18 @@ namespace AIScreenAutomationApp
             this.tabPage3.PerformLayout();
             this.tabPage4.ResumeLayout(false);
             this.tabPage4.PerformLayout();
+            this.tabPage2.ResumeLayout(false);
+            this.tabPage2.PerformLayout();
+            this.uiBoxCalibrateCaptureImgPanel.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.uiBoxCalibrateCaptureImg)).EndInit();
+            this.toolStrip6.ResumeLayout(false);
+            this.toolStrip6.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.uiBoxCalibrateMatchImg)).EndInit();
+            this.groupBox1.ResumeLayout(false);
+            this.groupBox1.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.uiVariablesTable)).EndInit();
+            this.toolStrip5.ResumeLayout(false);
+            this.toolStrip5.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -966,7 +1279,7 @@ namespace AIScreenAutomationApp
         private System.Windows.Forms.ToolStripButton uiDelFuncButton;
         internal System.Windows.Forms.ToolStripButton uiFunctionRun;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator2;
-        private System.Windows.Forms.TabControl tabControl1;
+        private System.Windows.Forms.TabControl uiBoxCalibrateTab;
         private System.Windows.Forms.TabPage tabPage1;
         private System.Windows.Forms.TabPage uiImageLibraryTab;
         private System.Windows.Forms.TabPage tabPage3;
@@ -1017,6 +1330,30 @@ namespace AIScreenAutomationApp
         private System.Windows.Forms.ToolStripButton uiILOCRBoxButton;
         private System.Windows.Forms.ToolStripButton uiStmtCommentToggle;
         private System.Windows.Forms.ToolStripButton uiInstCommentToggle;
+        private System.Windows.Forms.GroupBox groupBox1;
+        private System.Windows.Forms.ToolStrip toolStrip5;
+        private System.Windows.Forms.ToolStripLabel toolStripLabel3;
+        internal System.Windows.Forms.ToolStripComboBox uiVariablesTableGroupList;
+        internal System.Windows.Forms.DataGridView uiVariablesTable;
+        private System.Windows.Forms.DataGridViewTextBoxColumn name;
+        private System.Windows.Forms.DataGridViewTextBoxColumn Value;
+        private System.Windows.Forms.ToolStripButton uiVariablesTableDelButton;
+        private System.Windows.Forms.ToolStripButton uiInstRunButton;
+        private System.Windows.Forms.TabPage tabPage2;
+        private System.Windows.Forms.PictureBox uiBoxCalibrateMatchImg;
+        private System.Windows.Forms.PictureBox uiBoxCalibrateCaptureImg;
+        private System.Windows.Forms.ToolStrip toolStrip6;
+        private System.Windows.Forms.ToolStripButton uiBoxCalibrateMatchButton;
+        private System.Windows.Forms.ToolStripLabel toolStripLabel4;
+        private System.Windows.Forms.ToolStripComboBox toolStripComboBox1;
+        private System.Windows.Forms.ToolStripComboBox uiBoxCalibrateImgSelect;
+        private System.Windows.Forms.ToolStripButton uiBoxCalibratePasteCaptureImg;
+        private System.Windows.Forms.Panel uiBoxCalibrateCaptureImgPanel;
+        private System.Windows.Forms.ToolStripLabel uiBoxCalibrateZoomLabel;
+        private System.Windows.Forms.ToolStripLabel uiBoxCalibratePosValLabel;
+        private System.Windows.Forms.ToolStripButton uiBoxCalibrateExportButton;
+        private System.Windows.Forms.ToolStripLabel toolStripLabel5;
+        private System.Windows.Forms.ToolStripTextBox uiILFilterName;
     }
 }
 
